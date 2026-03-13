@@ -5,6 +5,8 @@
 
 `lms-line-sensor` is a MicroPython and MicroBlocks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It communicates with the sensor over I2C and exposes a small API for reading raw or calibrated data, calibration management, and LED control.
 
+</div>
+
 ## Features
 
 - Reads 8 light sensor channels in a single transfer.
