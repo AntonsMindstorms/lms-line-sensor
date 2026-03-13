@@ -4,7 +4,7 @@ LMS Line Sensor
 MicroPython driver documentation for the LMS Line Sensor.
 
 Installation
-============
+------------
 
 The package is distributed on PyPI for convenient versioning and packaging, but it is intended to run on MicroPython targets that provide the ``machine`` module.
 
@@ -17,10 +17,10 @@ Install the package locally:
 If your deployment workflow copies modules to the board manually, transfer ``line_sensor.py`` from the installed package to your device filesystem.
 
 Usage
-=====
+-----
 
 Micropython
------------
+***********
 
 Create a sensor instance by passing the I2C pin assignments and, if needed, a custom device address.
 
@@ -46,14 +46,14 @@ Useful constants exposed by ``LineSensor`` include:
 - ``POSITION``, ``MIN``, ``MAX``, ``DERIVATIVE``, and ``SHAPE`` for indexing values returned by ``data()``.
 
 Microblocks
------------
+***********
 
 Quick example program:
 
 .. image:: line-sensor-microblocks.png
 
 API Reference
-=============
+-------------
 
 .. automodule:: line_sensor
    :members:
