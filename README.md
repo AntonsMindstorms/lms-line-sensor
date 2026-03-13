@@ -101,10 +101,9 @@ The `LineSensor` class provides the public API.
 
 ## Documentation
 
-Sphinx documentation sources live in [docs](docs/). Build them with:
+You can read [the documentation on our API docs site](https://docs.antonsmindstorms.com/en/latest/Software/lms-line-sensor/docs/index.html) or build the Sphinx documentation from source in [docs](docs/). Build them with:
 
 ```bash
-pip install .[docs]
 sphinx-build -b html docs docs/_build/html
 ```
 
