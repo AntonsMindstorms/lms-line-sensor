@@ -18,7 +18,7 @@
 
 ## Installation
 
-### Micropython Using ViperIDE Package Manager (Recommended)
+### Micropython Installation Using ViperIDE Package Manager (Recommended)
 
 1. Open **ViperIDE** on your device
 2. Go to **Tools** → **Package Manager**
@@ -26,11 +26,11 @@
 4. Enter the package link: `https://github.com/antonsmindstorms/lms-line-sensor.git`
 5. Follow the on-screen prompts to complete installation
 
-### MicroBlocks
+### MicroBlocks Installation
 
 Open a [microblocks editor](https://microblocks.fun/run/microblocks.html) and drag [LMS Line Sensor](<microblocks/LMS Line Sensor.ubl>) into the browser window.
 
-### On regular Python
+### Regular Python Installation
 
 This package targets MicroPython devices. For packaging and distribution it is published on PyPI, but it must run on hardware that provides the `machine` module.
 
