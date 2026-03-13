@@ -1,0 +1,167 @@
+module 'Line Follower' Input
+author Ste7an
+version 1 4 
+choices led_modes off on inverted position 
+choices commands 'mode raw' 'mode calibrated' 'get version' debug calibrate 'is calibrated' 'load calibration' 'save calibration' 'get minimum' 'get maximum' 'set minimum' 'set maximum' neopixel 'set leds' 
+description 'I2C Line follower on ch32v203'
+variables _can_measure _line_data _line_inverted 
+
+  spec ' ' 'line init' 'line sensor init'
+  spec ' ' 'line sensor update' 'line sensor update'
+  spec ' ' 'line sensor invert' 'line sensor invert _' 'bool' true
+  spec 'r' 'read line' 'line sensor values'
+  spec 'r' 'position' 'line position'
+  spec 'r' 'line position derative' 'line position deravitive'
+  spec 'r' 'line sensor shape' 'line sensor shape'
+  space
+  spec ' ' 'command' 'line sensor command _ : value _' 'str.commands num' 'mode raw' 0
+  spec 'r' 'get version' 'line sensor  version'
+  space
+  spec 'r' 'is calibrated' 'line sensor is calibrated'
+  spec ' ' 'store calibration' 'store calibration'
+  spec ' ' 'restore calibration' 'restore calibration'
+  space
+  spec ' ' 'set emitter level' 'enable emitters _' 'bool' true
+  spec ' ' 'led mode' 'led mode _' 'str.led_modes' 'on'
+  spec ' ' 'neopixel' 'set NeoPixel _ color _' 'auto color' 10
+
+to command cmd args {
+  local 'cmd_id' 0
+  if (cmd == 'mode raw') {
+    cmd_id = 0
+  } (cmd == 'mode calibrated') {
+    cmd_id = 1
+  } (cmd == 'get version') {
+    cmd_id = 2
+  } (cmd == 'debug') {
+    cmd_id = 3
+  } (cmd == 'calibrate') {
+    cmd_id = 4
+  } (cmd == 'is calibrated') {
+    cmd_id = 5
+  } (cmd == 'load calibration') {
+    cmd_id = 6
+  } (cmd == 'save calibration') {
+    cmd_id = 7
+  } (cmd == 'get minimum') {
+    cmd_id = 8
+  } (cmd == 'get maximum') {
+    cmd_id = 9
+  } (cmd == 'set minimum') {
+    cmd_id = 10
+  } (cmd == 'set maximum') {
+    cmd_id = 11
+  } (cmd == 'neopixel') {
+    cmd_id = 12
+  } (cmd == 'set leds') {
+    cmd_id = 13
+  } (cmd == 'set emitter') {
+    cmd_id = 14
+  }
+  if ((argOrDefault 2 'None') == 'None') {
+    local 'buf' ('[data:makeList]' cmd_id)
+  } else {
+    local 'buf' ('[data:makeList]' cmd_id args)
+  }
+  '[sensors:i2cWrite]' 51 buf
+}
+
+to 'get version' {
+  _can_measure = (booleanConstant false)
+  local 'tmp' (newList 2)
+  command 'get version'
+  '[sensors:i2cRead]' 51 tmp
+  _can_measure = (booleanConstant false)
+  return ('[data:join]' (at 1 tmp) '.' (at 2 tmp))
+}
+
+to 'is calibrated' {
+  _can_measure = (booleanConstant false)
+  local 'buf' (newList 1)
+  command 'is calibrated'
+  '[sensors:i2cRead]' 51 buf
+  _can_measure = (booleanConstant true)
+  return ((at 1 buf) == 1)
+}
+
+to 'led mode' mode {
+  local 'led_mode' 0
+  if (mode == 'off') {
+    led_mode = 0
+  } (mode == 'on') {
+    led_mode = 1
+  } (mode == 'inverted') {
+    led_mode = 2
+  } (mode == 'position') {
+    led_mode = 3
+  }
+  '[sensors:i2cWrite]' 51 ('[data:makeList]' 13 led_mode)
+}
+
+to 'line init' {
+  _can_measure = (booleanConstant true)
+}
+
+to 'line position derative' {
+  return ((at 12 _line_data) - 128)
+}
+
+to 'line sensor invert' inverted {
+  _line_inverted = inverted
+}
+
+to 'line sensor shape' {
+  return (at 13 _line_data)
+}
+
+to 'line sensor update' {
+  _line_data = (newList 13)
+  if _can_measure {
+    '[sensors:i2cRead]' 51 _line_data
+  }
+}
+
+to neopixel nr color {
+  local 'r' ((color >> 16) & 255)
+  local 'g' ((color >> 8) & 255)
+  local 'b' (color & 255)
+  '[sensors:i2cWrite]' 51 ('[data:makeList]' 12 (nr - 1) r g b)
+}
+
+to position {
+  return ((at 9 _line_data) - 128)
+}
+
+to 'read line' {
+  local 'buf' (newList 8)
+  if _line_inverted {
+    for i 8 {
+      atPut i buf (255 - (at i _line_data))
+    }
+  } else {
+    for i 8 {
+      atPut i buf (at i _line_data)
+    }
+  }
+  return buf
+}
+
+to 'restore calibration' {
+  _can_measure = (booleanConstant false)
+  command 'load calibration'
+  waitMillis 500
+  _can_measure = (booleanConstant true)
+}
+
+to 'set emitter level' enable {
+  '[sensors:i2cWrite]' 51 ('[data:makeList]' 14 ('[data:convertType]' enable 'number')) true
+}
+
+to 'store calibration' {
+  _can_measure = (booleanConstant false)
+  command 'save calibration'
+  comment 'wait some safe time'
+  waitMillis 1000
+  _can_measure = (booleanConstant true)
+}
+

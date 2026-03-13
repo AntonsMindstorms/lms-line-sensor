@@ -1,0 +1,118 @@
+<div align="center">
+<img alt="lms line sensor logo" src="https://raw.githubusercontent.com/antonsmindstorms/lms-line-sensor/master/docs/lms-line-sensor.png" width="200">
+
+# LMS Line Sensor
+
+`lms-line-sensor` is a MicroPython and MicroBlocks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It communicates with the sensor over I2C and exposes a small API for reading raw or calibrated data, calibration management, and LED control.
+
+## Features
+
+- Reads 8 light sensor channels in a single transfer.
+- Exposes position, derivative, and line shape.
+- Supports raw and calibrated sensor modes.
+- Starts calibration and stores calibration values in EEPROM.
+- Controls the IR emitter and RGB LED display modes.
+- Aimed at ESP23 ([LMS-ESP32](https://www.antonsmindstorms.com/product/powerful-lms-esp32-board-for-spike-and-mindstorms/))
+
+## Installation
+
+### Micropython Using ViperIDE Package Manager (Recommended)
+
+1. Open **ViperIDE** on your device
+2. Go to **Tools** → **Package Manager**
+3. Select **Install Package via Link**
+4. Enter the package link: `https://github.com/antonsmindstorms/lms-line-sensor.git`
+5. Follow the on-screen prompts to complete installation
+
+### MicroBlocks
+
+Open a [microblocks editor](https://microblocks.fun/run/microblocks.html) and drag [LMS Line Sensor](<microblocks/LMS Line Sensor.ubl>) into the browser window.
+
+### On regular Python
+
+This package targets MicroPython devices. For packaging and distribution it is published on PyPI, but it must run on hardware that provides the `machine` module.
+
+Install from PyPI:
+
+```bash
+pip install lms-line-sensor
+```
+
+Copy the installed `line_sensor.py` module to your MicroPython device if your deployment flow does not install packages directly on the board.
+
+## Quick Start
+
+### Micropython
+
+```python
+from time import sleep
+
+from line_sensor import LineSensor
+
+sensor = LineSensor(scl_pin=4, sda_pin=5, device_addr=51)
+
+sensor.ir_led_on()
+sensor.load_calibration_from_rom()
+sensor.mode_calibrated()
+
+while True:
+    position = sensor.position()
+    derivative = sensor.position_derivative()
+    print(position, derivative)
+    sleep(0.1)
+```
+
+### Microblocks
+
+Here's a simple program that reads the line shape and distance from center.
+Shape is an ASCII character in the shape of the line: 
+
+```ascii
+SHAPE_NONE     = ' ',
+SHAPE_STRAIGHT = '|',
+SHAPE_T        = 'T',
+SHAPE_L_LEFT   = '<',
+SHAPE_L_RIGHT  = '>',
+SHAPE_Y        = 'Y'
+```
+
+![Microblocks example](docs/line-sensor-microblocks.png)
+
+## API Overview
+
+### `LineSensor`
+
+The `LineSensor` class provides the public API.
+
+- `light_values()` returns the 8 raw light sensor values.
+- `data(*indices)` returns the full 13-byte response or selected entries.
+- `position()` returns the current line position.
+- `position_derivative()` returns the derivative of the line position.
+- `shape()` returns the sensor-reported shape metric.
+- `mode_raw()` switches to raw reading mode.
+- `mode_calibrated()` switches to calibrated reading mode.
+- `start_calibration()` starts sensor calibration.
+- `ir_led_on()` and `ir_led_off()` control the IR emitter.
+- `rgb_led_mode(mode)` changes the RGB LED display mode.
+- `save_calibration_in_rom()` stores calibration data in EEPROM.
+- `load_calibration_from_rom()` loads calibration data from EEPROM.
+
+## Documentation
+
+Sphinx documentation sources live in [docs](docs/). Build them with:
+
+```bash
+pip install .[docs]
+sphinx-build -b html docs docs/_build/html
+```
+
+## Development Notes
+
+- Source module: `micropython/line_sensor.py`
+- API docs entry point: `docs/index.rst`
+- The Sphinx configuration mocks the MicroPython `machine` module so docs can be built on desktop Python.
+- Submit update to Pypi:
+  - Update version in [line sensor.py](micropython/line_sensor.py)
+  - Update version in [package.json](package.json)
+  - Activate venv
+  - `rm -rf ./dist && python -m build && twine upload dist/*`
