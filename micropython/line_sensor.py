@@ -196,7 +196,7 @@ class LineSensor:
         """Start sensor calibration."""
         self.last_mode = self.current_mode
         self.current_mode = self.MODE_CALIBRATING
-        self.write_command(self.LEDS_OFF)
+        self.write_command((self.CMD_LEDS, self.LEDS_OFF))        
         self.write_command(self.CMD_CALIBRATE)
 
     def calibrate(self, duration=5, save=True):
