@@ -1,7 +1,7 @@
 """MicroPython driver for the LMS Line Sensor over I2C."""
 
 from machine import I2C, Pin
-from time import sleep, ticks_ms
+from time import sleep, ticks_ms, ticks_diff
 from collections import deque
 
 __all__ = ["LineSensor"]
@@ -22,6 +22,8 @@ class LineSensor:
     # Command constants
     MODE_RAW = 0
     MODE_CALIBRATED = 1
+    MODE_SAVING = 2
+    MODE_CALIBRATING = 3
     CMD_GET_VERSION = 2
     CMD_DEBUG = 3
     CMD_CALIBRATE = 4
@@ -49,6 +51,8 @@ class LineSensor:
     MAX = 10
     DERIVATIVE = 11
     SHAPE = 12
+    VALUES = -1
+    VALUES_INVERTED = -2
 
     SHAPE_NONE = (" ",)
     SHAPE_STRAIGHT = ("|",)
@@ -56,6 +60,7 @@ class LineSensor:
     SHAPE_L_LEFT = ("<",)
     SHAPE_L_RIGHT = (">",)
     SHAPE_Y = "Y"
+    POSITION_WEIGHTS = (-127, -91, -54, -18, 18, 54, 91, 127)
 
     def __init__(self, scl_pin=4, sda_pin=5, device_addr=51):
         """
@@ -69,21 +74,15 @@ class LineSensor:
         self.device_addr = device_addr
         self.i2c = I2C(1, scl=Pin(scl_pin), sda=Pin(sda_pin))
         self.pos_history = deque([(0, 0)] * 5, 5)
-
-    def light_values(self, inverted=False):
-        """
-        Read only the 8 light sensor values.
-        """
-        if inverted:
-            return [255 - v for v in self.i2c.readfrom(self.device_addr, 8)]
-        else:
-            return list(self.i2c.readfrom(self.device_addr, 8))
+        self.current_mode = self.last_mode = self.MODE_RAW
+        self.current_rgb_mode = self.LEDS_OFF
+        self.save_timeout = 0
 
     def position_and_shape(self):
         """
         Calculate the position locally using the light values, which may be more responsive than the position value from the sensor.
         """
-        light_values = self.light_values(inverted=True)
+        light_values = self.data(self.VALUES_INVERTED)
 
         # Single pass: calculate min, max, sum
         min_light = light_values[0]
@@ -96,38 +95,66 @@ class LineSensor:
                 max_light = light
             total += light
 
-        average_light = total / 8
-        if max_light < average_light * 2:
+        if max_light * 4 < total:
+            # This is equivalent to saying 
+            # "if the average light is less than 25% of the max light, 
+            # then we are probably not on a line".
             self.pos_history.append((0, ticks_ms()))
             return 0, 0, " "
 
-        # Calculate weighted sum
+        # Calculate weighted sum directly in the -127..127 domain.
         weighted_sum = 0
-        total_light = 0.000001
-        for i, light in enumerate(light_values):
+        total_light = 0
+        for i in range(8):
+            light = light_values[i]
             adjusted = light - min_light
-            weighted_sum += i * adjusted
+            weighted_sum += self.POSITION_WEIGHTS[i] * adjusted
             total_light += adjusted
 
-        pos = round(((weighted_sum / total_light) - 3.5) / 7 * 255)
-        der = pos - self.pos_history[-2][0]  # Age is about 7ms per item in deque.
-        # print(ticks_ms() - self.pos_history[3][1])
+        if total_light == 0:
+            self.pos_history.append((0, ticks_ms()))
+            return 0, 0, " "
+
+        if weighted_sum >= 0:
+            pos = (weighted_sum + (total_light // 2)) // total_light
+        else:
+            pos = -((-weighted_sum + (total_light // 2)) // total_light)
+
+        # Age is about 7ms per item in deque. -2 = 14ms ago.
+        der = pos - self.pos_history[-2][0]  
+
         self.pos_history.append((pos, ticks_ms()))
         return pos, der, "|"
 
     def data(self, *indices):
-        try:
-            d = list(self.i2c.readfrom(self.device_addr, 13))
-        except:
-            d = list(self.i2c.readfrom(self.device_addr, 13))
-        d[self.POSITION] -= 128
-        d[self.DERIVATIVE] -= 128
-        if len(indices) == 0:
-            return d
-        elif len(indices) == 1:
-            return d[indices[0]]
+        if self.current_mode < 2:
+            # Try twice. Sometimes it fails. Firmware TODO.
+            try:
+                d = list(self.i2c.readfrom(self.device_addr, 13))
+            except:
+                d = list(self.i2c.readfrom(self.device_addr, 13))
+        elif self.current_mode == self.MODE_SAVING: 
+            if ticks_diff(ticks_ms(), self.save_timeout+1500) > 0:
+                self.write_command(self.last_mode)
+                self.current_mode = self.last_mode
+                self.write_command(self.current_rgb_mode)
+                print("done saving")
+            d = [0]*13
         else:
-            return [d[i] for i in indices]
+            d = [0]*13
+
+        if not indices:
+            return d
+        else:
+            retval = []
+            for idx in indices:
+                if idx == self.VALUES:
+                    retval += d[0:8]
+                if idx == self.VALUES_INVERTED:
+                    retval += [255-v for v in d[0:8]]
+                else:
+                    retval.append(d[idx])
+            return retval
 
     def position(self):
         """
@@ -157,15 +184,26 @@ class LineSensor:
 
     def mode_raw(self):
         """Set sensor to raw mode."""
+        self.current_mode = self.MODE_RAW
         self.write_command(self.MODE_RAW)
 
     def mode_calibrated(self):
         """Set sensor to calibrated mode."""
+        self.current_mode = self.MODE_CALIBRATED
         self.write_command(self.MODE_CALIBRATED)
 
     def start_calibration(self):
         """Start sensor calibration."""
+        self.last_mode = self.current_mode
+        self.current_mode = self.MODE_CALIBRATING
+        self.write_command(self.LEDS_OFF)
         self.write_command(self.CMD_CALIBRATE)
+
+    def calibrate(self, duration=5, save=True):
+        self.start_calibration()
+        sleep(duration)
+        self.stop_calibration(save=save)
+        sleep(1)
 
     def ir_on(self):
         """Turn the IR emitter on."""
@@ -177,11 +215,19 @@ class LineSensor:
 
     def rgb_mode(self, mode):
         """Set the onboard RGB LED mode."""
+        self.current_rgb_mode = mode
         self.write_command((self.CMD_LEDS, mode))
 
-    def save_calibration(self):
+    def stop_calibration(self, save=True):
         """Persist calibration values to the sensor EEPROM."""
-        self.write_command(self.CMD_SAVE_CAL)
+        if save:
+            self.write_command(self.CMD_SAVE_CAL)
+            self.save_timeout = ticks_ms()
+            self.current_mode = self.MODE_SAVING
+        else:
+            self.write_command(self.current_mode)
+            self.write_command(self.current_rgb_mode)
+            
 
     def load_calibration(self):
         """Load previously saved calibration values from EEPROM."""
