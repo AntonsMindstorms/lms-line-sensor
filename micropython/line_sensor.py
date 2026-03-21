@@ -53,11 +53,11 @@ class LineSensor:
     VALUES = -1
     VALUES_INVERTED = -2
 
-    SHAPE_NONE = (" ",)
-    SHAPE_STRAIGHT = ("|",)
-    SHAPE_T = ("T",)
-    SHAPE_L_LEFT = ("<",)
-    SHAPE_L_RIGHT = (">",)
+    SHAPE_NONE = " "
+    SHAPE_STRAIGHT = "|"
+    SHAPE_T = "T"
+    SHAPE_L_LEFT = "<"
+    SHAPE_L_RIGHT = ">"
     SHAPE_Y = "Y"
 
     # Firmware TODO: This should be configurable so you can then weigh the outer sensors more.
