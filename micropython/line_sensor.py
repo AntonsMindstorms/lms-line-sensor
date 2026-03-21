@@ -69,10 +69,8 @@ class LineSensor:
         self.pos_history = deque([(0, 0)] * 5, 5)
         self.current_mode = self.last_mode = self.MODE_RAW
         self.current_rgb_mode = self.LEDS_OFF
-        self.save_timeout = 0
-        self.black_line = (
-            True  # Firmware TODO: implement auto-inversion after calibration. see check_inverted() for current placeholder implementation.
-        )
+        self.save_start_time = 0
+        self.black_line = True  # Firmware TODO: implement auto-inversion after calibration.
 
     def position_and_shape(self):
         """
@@ -157,7 +155,7 @@ class LineSensor:
         Example:
             sensor.data(sensor.VALUES, sensor.POSITION)  # returns light values and position
         """
-        if self.current_mode < 2:
+        if self.current_mode < 2: # Not calibrating or saving, safe to read from sensor.
             # Try twice. Sometimes it fails. Firmware TODO.
             try:
                 d = list(self.i2c.readfrom(self.device_addr, 13))
@@ -166,12 +164,10 @@ class LineSensor:
         elif self.current_mode == self.MODE_SAVING:
             # Avoid reading from the sensor while it's saving, which can cause it to crash.
             # Firmware TODO.
-            if ticks_diff(ticks_ms(), self.save_timeout + 1500) > 0:
+            if ticks_diff(ticks_ms(), self.save_start_time + 1500) > 0:
                 self.write_command(self.last_mode)
                 self.current_mode = self.last_mode
-                self.write_command(self.current_rgb_mode)
-                self.check_inverted()
-                print("done saving")
+                print("Calibration stored in EEPROM")
             d = [0] * 13
         else:
             d = [0] * 13
@@ -239,14 +235,16 @@ class LineSensor:
     def stop_calibration(self, save=True):
         """Persist calibration values to the sensor EEPROM."""
         # Firmware TODO: output 0 values while saving to avoid read timouts.
+        self.write_command(self.MODE_CALIBRATED)
+        self.write_command(self.current_rgb_mode)
+        self.check_inverted()
+        self.write_command(self.last_mode)
         if save:
             self.write_command(self.CMD_SAVE_CAL)
-            self.save_timeout = ticks_ms()
+            self.save_start_time = ticks_ms()
             self.current_mode = self.MODE_SAVING
         else:
-            self.write_command(self.current_mode)
-            self.write_command(self.current_rgb_mode)
-            self.check_inverted()
+            self.current_mode = self.last_mode
             
     def check_inverted(self):
         """Check if the line is black or white after calibration."""
@@ -269,6 +267,8 @@ class LineSensor:
         self.stop_calibration(save=save)
         if save: 
             sleep(1.5)
+            print("Calibration stored in EEPROM")
+            self.current_mode = self.last_mode
 
     def ir_power(self, power):
         """Set the IR emitter power."""
