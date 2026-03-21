@@ -66,10 +66,11 @@ class LineSensor:
         self.device_addr = device_addr
         self.i2c = I2C(1, scl=Pin(scl_pin), sda=Pin(sda_pin))
         self.pos_history = deque([(0, 0)] * 5, 5)
-        self.current_mode = self.last_mode = self.MODE_RAW
         self.current_rgb_mode = self.LEDS_OFF
         self.save_start_time = 0
-        self.black_line = True  # Firmware TODO: implement auto-inversion after calibration.
+        self.load_calibration()
+        self.mode_calibrated()
+        self.check_line_type() # Firmware TODO: implement auto-inversion after calibration.
 
     def position_and_shape(self):
         """
@@ -213,12 +214,12 @@ class LineSensor:
 
     def mode_raw(self):
         """Set sensor to raw mode."""
-        self.current_mode = self.MODE_RAW
+        self.current_mode = self.last_mode = self.MODE_RAW
         self.write_command(self.MODE_RAW)
 
     def mode_calibrated(self):
         """Set sensor to calibrated mode."""
-        self.current_mode = self.MODE_CALIBRATED
+        self.current_mode = self.last_mode = self.MODE_CALIBRATED
         self.write_command(self.MODE_CALIBRATED)
 
     def start_calibration(self):
@@ -227,6 +228,7 @@ class LineSensor:
         # Firmware TODO: implement calibration timer
         # so you can self.write_command((self.CMD_CALIBRATE, 5)) to calibrate for 5 seconds,
         # then automatically switch back to the previous mode.
+        print("Starting calibration")
         self.last_mode = self.current_mode
         self.current_mode = self.MODE_CALIBRATING
         self.write_command((self.CMD_LEDS, self.LEDS_OFF))
@@ -235,9 +237,10 @@ class LineSensor:
     def stop_calibration(self, save=True):
         """Persist calibration values to the sensor EEPROM."""
         # Firmware TODO: output 0 values while saving to avoid read timouts.
+        print("Stopping calibration, save new values:", save)
         self.write_command(self.MODE_CALIBRATED)
         self.write_command(self.current_rgb_mode)
-        self.check_inverted()
+        self.check_line_type()
         self.write_command(self.last_mode)
         if save:
             self.write_command(self.CMD_SAVE_CAL)
@@ -246,12 +249,12 @@ class LineSensor:
         else:
             self.current_mode = self.last_mode
             
-    def check_inverted(self):
+    def check_line_type(self):
         """Check if the line is black or white after calibration."""
         # Firmware TODO: implement auto-inversion after calibration 
-        values = self.data(self.VALUES)
+        values = list(self.i2c.readfrom(self.device_addr, 8))
         avg = sum(values) // len(values)
-        self.black_line = avg < 128
+        self.black_line = avg > 128 # Most sensors return white, lots of light.
         print("Line is", "black" if self.black_line else "white")
 
     def calibrate(self, duration=5, save=True):
@@ -298,8 +301,6 @@ if __name__ == "__main__":
     # sleep(5)
     # sensor.mode_calibrated()
 
-    sensor.load_calibration()
-    sensor.mode_calibrated()
     sensor.rgb_mode(sensor.LEDS_VALUES)
 
     # Read just light values
