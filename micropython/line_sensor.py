@@ -41,8 +41,8 @@ class LineSensor:
 
     # LED Modes
     LEDS_OFF = 0
-    LEDS_NORMAL = 1
-    LEDS_INVERTED = 2
+    LEDS_VALUES = 1  # Firmware TODO: implement better thresholds.
+    LEDS_VALUES_INVERTED = 2
     LEDS_POSITION = 3
     LEDS_MAX = 4
 
@@ -60,6 +60,8 @@ class LineSensor:
     SHAPE_L_LEFT = ("<",)
     SHAPE_L_RIGHT = (">",)
     SHAPE_Y = "Y"
+
+    # Firmware TODO: This should be configurable so you can then weigh the outer sensors more.
     POSITION_WEIGHTS = (-127, -91, -54, -18, 18, 54, 91, 127)
 
     def __init__(self, scl_pin=4, sda_pin=5, device_addr=51):
@@ -77,57 +79,79 @@ class LineSensor:
         self.current_mode = self.last_mode = self.MODE_RAW
         self.current_rgb_mode = self.LEDS_OFF
         self.save_timeout = 0
+        self.black_line = (
+            True  # Firmware TODO: implement auto-inversion after calibration. see check_inverted() for current placeholder implementation.
+        )
 
     def position_and_shape(self):
         """
-        Calculate the position locally using the light values, which may be more responsive than the position value from the sensor.
+        Calculate the position, derivative, and shape of the line based on the calibrated/raw sensor values.
         """
-        light_values = self.data(self.VALUES_INVERTED)
+        # Firmware TODO: implement this for faster performance.
+        # Firmware TODO: implement auto-inversion after calibration. see check_inverted() for current placeholder implementation.
+        values = self.data(self.VALUES_INVERTED if self.black_line else self.VALUES)
 
         # Single pass: calculate min, max, sum
-        min_light = light_values[0]
-        max_light = light_values[0]
+        min_value = values[0]
+        max_value = values[0]
         total = 0
-        for light in light_values:
-            if light < min_light:
-                min_light = light
-            if light > max_light:
-                max_light = light
-            total += light
+        for v in values:
+            if v < min_value:
+                min_value = v
+            if v > max_value:
+                max_value = v
+            total += v
 
-        if max_light * 4 < total:
-            # This is equivalent to saying 
-            # "if max light is less than 2 times the average light, 
-            # then we are probably not on a line".
-            # (avg=total/8, so 2*avg=total/4)
+        # First check if we're off the line.
+        # To do this we find out if the average is low and if the max is not much higher than the average. This is a sign of being off the line,
+        if total < 160 and max_value < total // 4:
             self.pos_history.append((0, ticks_ms()))
-            return 0, 0, " "
+            return 0, 0, self.SHAPE_NONE
+
+        # Build an 8-bit mask where bit i is 1 when sensor i is above threshold.
+        # 14% above average threshold: v > (total / 8) * 1.14 <=> v * 7 > total.
+        mask = 0
+        for i, v in enumerate(values):
+            if v * 7 > total:
+                mask |= 1 << i
+
+        shape = self.SHAPE_STRAIGHT
+        if (mask & 0b00111100) == 0b00111100:  # bits 2..5 set, regardless of other bits
+            shape = self.SHAPE_T
+        elif (mask & 0b00001110) == 0b00001110:  # bits 1..3 set, regardless of other bits
+            shape = self.SHAPE_L_RIGHT
+        elif (mask & 0b01110000) == 0b01110000:  # bits 4..6 set, regardless of other bits
+            shape = self.SHAPE_L_LEFT
+        # Y-shape placeholder: middle bits 3 and 4 should be off,
+        # and both left and right sides should have signal.
+        elif (mask & 0b00011000) == 0 and (mask & 0b00000111) != 0 and (mask & 0b11100000) != 0:
+            shape = self.SHAPE_Y
 
         # Calculate weighted sum directly in the -127..127 domain.
         weighted_sum = 0
-        total_light = 0
+        total_adjusted = 0
         for i in range(8):
-            light = light_values[i]
-            adjusted = light - min_light
+            v = values[i]
+            adjusted = v - min_value
             weighted_sum += self.POSITION_WEIGHTS[i] * adjusted
-            total_light += adjusted
+            total_adjusted += adjusted
 
-        if total_light == 0:
+        if total_adjusted == 0:
             self.pos_history.append((0, ticks_ms()))
-            return 0, 0, " "
+            return 0, 0, self.SHAPE_NONE
 
         # This is a sign-safe integer step for: round(weighted_sum/total_light)
         # which keeps position estimates balanced left vs right and is 6x - 10x faster.
         if weighted_sum >= 0:
-            pos = (weighted_sum + (total_light // 2)) // total_light
+            pos = (weighted_sum + (total_adjusted // 2)) // total_adjusted
         else:
-            pos = -((-weighted_sum + (total_light // 2)) // total_light)
+            pos = -((-weighted_sum + (total_adjusted // 2)) // total_adjusted)
 
         # Age is about 7ms per item in deque. -2 = 14ms ago.
-        der = pos - self.pos_history[-2][0]  
+        der = pos - self.pos_history[-2][0]
 
         self.pos_history.append((pos, ticks_ms()))
-        return pos, der, "|"
+        return pos, der, shape
 
     def data(self, *indices):
         if self.current_mode < 2:
@@ -136,15 +160,18 @@ class LineSensor:
                 d = list(self.i2c.readfrom(self.device_addr, 13))
             except:
                 d = list(self.i2c.readfrom(self.device_addr, 13))
-        elif self.current_mode == self.MODE_SAVING: 
-            if ticks_diff(ticks_ms(), self.save_timeout+1500) > 0:
+        elif self.current_mode == self.MODE_SAVING:
+            # Avoid reading from the sensor while it's saving, which can cause it to crash.
+            # Firmware TODO.
+            if ticks_diff(ticks_ms(), self.save_timeout + 1500) > 0:
                 self.write_command(self.last_mode)
                 self.current_mode = self.last_mode
                 self.write_command(self.current_rgb_mode)
+                self.check_inverted()
                 print("done saving")
-            d = [0]*13
+            d = [0] * 13
         else:
-            d = [0]*13
+            d = [0] * 13
 
         if not indices:
             return d
@@ -154,7 +181,7 @@ class LineSensor:
                 if idx == self.VALUES:
                     retval += d[0:8]
                 if idx == self.VALUES_INVERTED:
-                    retval += [255-v for v in d[0:8]]
+                    retval += [255 - v for v in d[0:8]]
                 else:
                     retval.append(d[idx])
             return retval
@@ -197,16 +224,41 @@ class LineSensor:
 
     def start_calibration(self):
         """Start sensor calibration."""
+        # Firmware TODO: turn off LEDs during calibration, which can interfere with light readings.
+        # Firmware TODO: implement calibration timer
+        # so you can self.write_command((self.CMD_CALIBRATE, 5)) to calibrate for 5 seconds,
+        # then automatically switch back to the previous mode.
         self.last_mode = self.current_mode
         self.current_mode = self.MODE_CALIBRATING
-        self.write_command((self.CMD_LEDS, self.LEDS_OFF))        
+        self.write_command((self.CMD_LEDS, self.LEDS_OFF))
         self.write_command(self.CMD_CALIBRATE)
+
+    def stop_calibration(self, save=True):
+        """Persist calibration values to the sensor EEPROM."""
+        # Firmware TODO: output 0 values while saving to avoid read timouts.
+        if save:
+            self.write_command(self.CMD_SAVE_CAL)
+            self.save_timeout = ticks_ms()
+            self.current_mode = self.MODE_SAVING
+        else:
+            self.write_command(self.current_mode)
+            self.write_command(self.current_rgb_mode)
+            self.check_inverted()
+            
+    def check_inverted(self):
+        """Check if the line is black or white after calibration."""
+        # Firmware TODO: implement auto-inversion after calibration 
+        values = self.data(self.VALUES)
+        avg = sum(values) // len(values)
+        self.black_line = avg < 128
+        print("Line is", "black" if self.black_line else "white")
 
     def calibrate(self, duration=5, save=True):
         self.start_calibration()
         sleep(duration)
         self.stop_calibration(save=save)
-        sleep(1)
+        if save: 
+            sleep(1.5)
 
     def ir_on(self):
         """Turn the IR emitter on."""
@@ -220,17 +272,6 @@ class LineSensor:
         """Set the onboard RGB LED mode."""
         self.current_rgb_mode = mode
         self.write_command((self.CMD_LEDS, mode))
-
-    def stop_calibration(self, save=True):
-        """Persist calibration values to the sensor EEPROM."""
-        if save:
-            self.write_command(self.CMD_SAVE_CAL)
-            self.save_timeout = ticks_ms()
-            self.current_mode = self.MODE_SAVING
-        else:
-            self.write_command(self.current_mode)
-            self.write_command(self.current_rgb_mode)
-            
 
     def load_calibration(self):
         """Load previously saved calibration values from EEPROM."""
@@ -252,11 +293,11 @@ if __name__ == "__main__":
 
     sensor.load_calibration()
     sensor.mode_calibrated()
-    sensor.rgb_mode(sensor.LEDS_POSITION)
+    sensor.rgb_mode(sensor.LEDS_VALUES)
 
     # Read just light values
     for i in range(1000):
-        pos = sensor.position()
-        der = sensor.position_derivative()
-        print("Pos:", pos, der)
-        sleep(0.1)
+        # pos = sensor.position()
+        # der = sensor.position_derivative()
+        print(sensor.position_and_shape())
+        sleep(0.5)
