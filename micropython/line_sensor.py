@@ -51,7 +51,6 @@ class LineSensor:
     DERIVATIVE = 11
     SHAPE = 12
     VALUES = -1
-    VALUES_INVERTED = -2
 
     SHAPE_NONE = " "
     SHAPE_STRAIGHT = "|"
@@ -78,7 +77,7 @@ class LineSensor:
         """
         # Firmware TODO: implement this for faster performance.
         # Firmware TODO: implement auto-inversion after calibration. see check_inverted() for current placeholder implementation.
-        values = self.data(self.VALUES_INVERTED if self.black_line else self.VALUES)
+        values = self.data(self.VALUES)
 
         # Single pass: calculate min, max, sum
         min_value = values[0]
@@ -178,9 +177,10 @@ class LineSensor:
             retval = []
             for idx in indices:
                 if idx == self.VALUES:
-                    retval += d[0:8]
-                if idx == self.VALUES_INVERTED:
-                    retval += [255 - v for v in d[0:8]]
+                    if self.black_line:
+                        retval += [255 - v for v in d[0:8]]
+                    else:
+                        retval += d[0:8]
                 else:
                     retval.append(d[idx])
             return retval
