@@ -12,11 +12,10 @@ class LineSensor:
     """
     MicroPython class for line following sensor via I2C.
 
-    Reads 11 bytes:
-    - Bytes 0-7: Light values from 8 sensors
-    - Byte 8: Position
-    - Byte 9: Min value
-    - Byte 10: Max value
+    Args:
+        scl_pin: SCL pin number (default 4)
+        sda_pin: SDA pin number (default 5)
+        device_addr: I2C device address (default 51)
     """
 
     # Command constants
@@ -28,7 +27,7 @@ class LineSensor:
     CMD_DEBUG = 3
     CMD_CALIBRATE = 4
     CMD_IS_CALIBRATED = 5
-    CMD_LOAD_CAL = 6  # load calibrated values frpom eeprom
+    CMD_LOAD_CAL = 6  # load calibrated values from eeprom
     CMD_SAVE_CAL = 7  # save calibrated values to eeprom
     CMD_GET_MIN = 8
     CMD_GET_MAX = 9
@@ -65,14 +64,6 @@ class LineSensor:
     POSITION_WEIGHTS = (-127, -91, -54, -18, 18, 54, 91, 127)
 
     def __init__(self, scl_pin=4, sda_pin=5, device_addr=51):
-        """
-        Initialize the line sensor.
-
-        Args:
-            scl_pin: SCL pin number (default 4)
-            sda_pin: SDA pin number (default 5)
-            device_addr: I2C device address (default 51)
-        """
         self.device_addr = device_addr
         self.i2c = I2C(1, scl=Pin(scl_pin), sda=Pin(sda_pin))
         self.pos_history = deque([(0, 0)] * 5, 5)
@@ -154,6 +145,18 @@ class LineSensor:
         return pos, der, shape
 
     def data(self, *indices):
+        """
+        Read sensor data of choice.
+        
+        Args:
+            indices: Optional list of indices to read. If empty, returns all values.
+        
+        Returns:
+            list: Sensor data values.
+        
+        Example:
+            sensor.data(sensor.VALUES, sensor.POSITION)  # returns light values and position
+        """
         if self.current_mode < 2:
             # Try twice. Sometimes it fails. Firmware TODO.
             try:
@@ -254,19 +257,23 @@ class LineSensor:
         print("Line is", "black" if self.black_line else "white")
 
     def calibrate(self, duration=5, save=True):
+        """
+        Convenience method to calibrate for a certain duration and then save if desired.
+        
+        Args:
+            duration: Duration in seconds to run the calibration (default 5)
+            save: Whether to save the calibration values to EEPROM after calibration (default True)
+        """
         self.start_calibration()
         sleep(duration)
         self.stop_calibration(save=save)
         if save: 
             sleep(1.5)
 
-    def ir_on(self):
-        """Turn the IR emitter on."""
-        self.write_command((self.CMD_SET_EMITTER, 1))
-
-    def ir_off(self):
-        """Turn the IR emitter off."""
-        self.write_command((self.CMD_SET_EMITTER, 0))
+    def ir_power(self, power):
+        """Set the IR emitter power."""
+        # Firmware TODO: implement power levels for emitters, not just on/off.
+        self.write_command((self.CMD_SET_EMITTER, 1 if power else 0))
 
     def rgb_mode(self, mode):
         """Set the onboard RGB LED mode."""
@@ -283,7 +290,7 @@ if __name__ == "__main__":
     # Initialize sensor
     sensor = LineSensor()
 
-    sensor.ir_on()
+    sensor.ir_power(True)
 
     # # # Optionally start calibration
     # sensor.rgb_mode(sensor.LEDS_INVERTED)
