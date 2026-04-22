@@ -1,49 +1,19 @@
-"""MicroPython driver for the LMS Line Sensor over I2C."""
+"""MicroPython driver for the LMS Line Sensor over I2C or uRemote (Pybricks)."""
 
-from machine import I2C, Pin
-from time import sleep, ticks_ms, ticks_diff
-from collections import deque
-
-__all__ = ["LineSensor"]
-__version__ = "0.1.0"
+__all__ = ["LineSensorI2C", "LineSensorUR"]
+__version__ = "0.2.0"
 
 
-class LineSensor:
-    """
-    MicroPython class for line following sensor via I2C.
+class BaseLineSensor:
+    """Base class for LMS Line Sensor implementations. Defines shared constants."""
 
-    Args:
-        scl_pin: SCL pin number (default 4)
-        sda_pin: SDA pin number (default 5)
-        device_addr: I2C device address (default 51)
-    """
+    RAW_BYTES = 13
+    SENSOR_COUNT = 8
 
-    # Command constants
     MODE_RAW = 0
     MODE_CALIBRATED = 1
     MODE_SAVING = 2
     MODE_CALIBRATING = 3
-    CMD_GET_VERSION = 2
-    CMD_DEBUG = 3
-    CMD_CALIBRATE = 4
-    CMD_IS_CALIBRATED = 5
-    CMD_LOAD_CAL = 6  # load calibrated values from eeprom
-    CMD_SAVE_CAL = 7  # save calibrated values to eeprom
-    CMD_GET_MIN = 8
-    CMD_GET_MAX = 9
-    CMD_SET_MIN = 10
-    CMD_SET_MAX = 11
-    CMD_NEOPIXEL = 12  # neopixel: lednr, r, g, b, write
-    CMD_LEDS = 13
-    CMD_SET_EMITTER = 14  # optional for qtr sensors, 1 for on, 0 for zero.
-    MAX_CMDS = 15
-
-    # LED Modes
-    LEDS_OFF = 0
-    LEDS_VALUES = 1  # Firmware TODO: implement better thresholds.
-    LEDS_VALUES_INVERTED = 2
-    LEDS_POSITION = 3
-    LEDS_MAX = 4
 
     POSITION = 8
     MIN = 9
@@ -52,6 +22,12 @@ class LineSensor:
     SHAPE = 12
     VALUES = -1
 
+    LEDS_OFF = 0
+    LEDS_VALUES = 1
+    LEDS_VALUES_INVERTED = 2
+    LEDS_POSITION = 3
+    LEDS_MAX = 4
+
     SHAPE_NONE = " "
     SHAPE_STRAIGHT = "|"
     SHAPE_T = "T"
@@ -59,150 +35,218 @@ class LineSensor:
     SHAPE_L_RIGHT = ">"
     SHAPE_Y = "Y"
 
-    # Firmware TODO: This should be configurable so you can then weigh the outer sensors more.
-    POSITION_WEIGHTS = (-127, -91, -54, -18, 18, 54, 91, 127)
+    def _decode_index(self, raw, idx, invert_values=False):
+        if idx == self.VALUES:
+            values = raw[: self.SENSOR_COUNT]
+            if invert_values:
+                return tuple(255 - v for v in values)
+            return tuple(values)
+        if idx == self.POSITION or idx == self.DERIVATIVE:
+            return raw[idx] - 128
+        if idx == self.SHAPE:
+            return chr(raw[idx])
+        return raw[idx]
 
-    def __init__(self, scl_pin=4, sda_pin=5, device_addr=51):
-        self.device_addr = device_addr
-        self.i2c = I2C(1, scl=Pin(scl_pin), sda=Pin(sda_pin))
-        self.pos_history = deque([(0, 0)] * 5, 5)
-        self.current_rgb_mode = self.LEDS_OFF
-        self.save_start_time = 0
-        self.load_calibration()
-        self.mode_calibrated()
-        self.check_line_type() # Firmware TODO: implement auto-inversion after calibration.
+    def data(self, *indices) -> tuple:
+        """Implemented in subclasses."""
+        raise RuntimeError("Subclasses must implement data().")
 
-    def position_and_shape(self):
-        """
-        Calculate the position, derivative, and shape of the line based on the calibrated/raw sensor values.
-        """
-        # Firmware TODO: implement this for faster performance.
-        # Firmware TODO: implement auto-inversion after calibration. see check_inverted() for current placeholder implementation.
-        values = self.data(self.VALUES)
-
-        # Single pass: calculate min, max, sum
-        min_value = values[0]
-        max_value = values[0]
-        total = 0
-        for v in values:
-            if v < min_value:
-                min_value = v
-            if v > max_value:
-                max_value = v
-            total += v
-
-        # First check if we're off the line.
-        # To do this we find out if the average is low and if the max is not much higher than the average. This is a sign of being off the line,
-        if total < 160 and max_value < total // 4:
-            self.pos_history.append((0, ticks_ms()))
-            return 0, 0, self.SHAPE_NONE
-
-        # Build an 8-bit mask where bit i is 1 when sensor i is above threshold.
-        # 14% above average threshold: v > (total / 8) * 1.14 <=> v * 7 > total.
-        mask = 0
-        for i, v in enumerate(values):
-            if v * 7 > total:
-                mask |= 1 << i
-
-        shape = self.SHAPE_STRAIGHT
-        if (mask & 0b00111100) == 0b00111100:  # bits 2..5 set, regardless of other bits
-            shape = self.SHAPE_T
-        elif (mask & 0b00001110) == 0b00001110:  # bits 1..3 set, regardless of other bits
-            shape = self.SHAPE_L_RIGHT
-        elif (mask & 0b01110000) == 0b01110000:  # bits 4..6 set, regardless of other bits
-            shape = self.SHAPE_L_LEFT
-        # Y-shape placeholder: middle bits 3 and 4 should be off,
-        # and both left and right sides should have signal.
-        elif (mask & 0b00011000) == 0 and (mask & 0b00000111) != 0 and (mask & 0b11100000) != 0:
-            shape = self.SHAPE_Y
-
-        # Calculate weighted sum directly in the -127..127 domain.
-        weighted_sum = 0
-        total_adjusted = 0
-        for i in range(8):
-            v = values[i]
-            adjusted = v - min_value
-            weighted_sum += self.POSITION_WEIGHTS[i] * adjusted
-            total_adjusted += adjusted
-
-        if total_adjusted == 0:
-            self.pos_history.append((0, ticks_ms()))
-            return 0, 0, self.SHAPE_NONE
-
-        # This is a sign-safe integer step for: round(weighted_sum/total_light)
-        # which keeps position estimates balanced left vs right and is 6x - 10x faster.
-        if weighted_sum >= 0:
-            pos = (weighted_sum + (total_adjusted // 2)) // total_adjusted
-        else:
-            pos = -((-weighted_sum + (total_adjusted // 2)) // total_adjusted)
-
-        # Age is about 7ms per item in deque. -2 = 14ms ago.
-        der = pos - self.pos_history[-2][0]
-
-        self.pos_history.append((pos, ticks_ms()))
-        return pos, der, shape
-
-    def data(self, *indices):
-        """
-        Read sensor data of choice.
-        
-        Args:
-            indices: Optional list of indices to read. If empty, returns all values.
-        
-        Returns:
-            list: Sensor data values.
-        
-        Example:
-            sensor.data(sensor.VALUES, sensor.POSITION)  # returns light values and position
-        """
-        if self.current_mode < 2: # Not calibrating or saving, safe to read from sensor.
-            # Try twice. Sometimes it fails. Firmware TODO.
-            try:
-                d = list(self.i2c.readfrom(self.device_addr, 13))
-            except:
-                d = list(self.i2c.readfrom(self.device_addr, 13))
-        elif self.current_mode == self.MODE_SAVING:
-            # Avoid reading from the sensor while it's saving, which can cause it to crash.
-            # Firmware TODO.
-            if ticks_diff(ticks_ms(), self.save_start_time + 1500) > 0:
-                self.write_command(self.last_mode)
-                self.current_mode = self.last_mode
-                print("Calibration stored in EEPROM")
-            d = [0] * 13
-        else:
-            d = [0] * 13
-
+    def _select_indices(self, raw, indices, invert_values=False):
         if not indices:
-            return d
-        else:
-            retval = []
-            for idx in indices:
-                if idx == self.VALUES:
-                    if self.black_line:
-                        retval += [255 - v for v in d[0:8]]
-                    else:
-                        retval += d[0:8]
-                else:
-                    retval.append(d[idx])
-            return retval
+            return tuple(raw)
+
+        if len(indices) == 1:
+            return self._decode_index(raw, indices[0], invert_values=invert_values)
+
+        out = []
+        for idx in indices:
+            decoded = self._decode_index(raw, idx, invert_values=invert_values)
+            if idx == self.VALUES:
+                out.extend(decoded)
+            else:
+                out.append(decoded)
+        return tuple(out)
+
+    def sensors(self):
+        """Read the 8 sensor channel values."""
+        return self.data(self.VALUES)
 
     def position(self):
-        """
-        Read the position value.
-        """
+        """Read the line position (-128 to 127, where 0 is center)."""
         return self.data(self.POSITION)
 
-    def position_derivative(self):
-        """
-        Read the position derivative value.
-        """
+    def derivative(self):
+        """Read the position derivative (rate of position change)."""
         return self.data(self.DERIVATIVE)
 
     def shape(self):
-        """
-        Read the shape value.
-        """
+        """Read the line shape as an ASCII character."""
         return self.data(self.SHAPE)
+
+    def position_derivative_shape(self) -> tuple:
+        """Read line position, derivative, and shape."""
+        return self.data(self.POSITION, self.DERIVATIVE, self.SHAPE)
+
+
+class LineSensorUR(BaseLineSensor):
+    """LMS Line Sensor via uRemote (Pybricks)."""
+
+    def __init__(self, port):
+        try:
+            from uremote import uRemote
+            from pybricks.tools import wait
+        except ImportError:
+            raise RuntimeError(
+                "LineSensorUR requires Pybricks and uRemote. "
+                "Use LineSensorI2C for direct I2C access on MicroPython."
+            )
+        self.ur = uRemote(port)
+        self.wait = wait
+
+    def read_all(self):
+        """Read all 13 sensor bytes from firmware."""
+        self.wait(1)
+        ack, data = self.ur.call("all")
+        if ack == "!ERROR":
+            return [0] * 13
+        else:
+            return data
+
+    def data(self, *indices) -> tuple:
+        """
+        Read sensor data with optional index-based filtering.
+
+        With no indices, this returns the raw 13-byte payload as a tuple.
+        With one index, this returns a single value directly.
+        With multiple indices, this returns a tuple in the same order as requested.
+
+        Example:
+            sensor.data(sensor.POSITION) -> -12
+            sensor.data(sensor.POSITION, sensor.SHAPE) -> (-12, '|')
+        """
+        raw = self.read_all()
+        return self._select_indices(raw, indices)
+
+    def mode_raw(self):
+        """Set sensor to raw mode."""
+        self.ur.call("mode", 0)
+
+    def mode_calibrated(self):
+        """Set sensor to calibrated mode."""
+        self.ur.call("mode", 1)
+
+    def leds(self, mode):
+        """Set LED display mode."""
+        self.ur.call("led", mode)
+
+    def save_calibration(self):
+        """Save calibration values to EEPROM."""
+        self.ur.call("save")
+
+    def load_calibration(self):
+        """Load calibration values from EEPROM."""
+        self.ur.call("load")
+
+    def calibrate(self, duration=5):
+        """
+        Convenience method to calibrate for a certain duration and then save if desired.
+
+        Args:
+            duration: Duration in seconds to run the calibration (default 5)
+            Calibration is always saved to EEPROM after calibration.
+        """
+        self.leds(self.LEDS_OFF)
+        self.start_calibration()
+        self.wait(1000 * (duration + 1))
+        self.wait(1500)
+        print("Calibration stored in EEPROM")
+        self.save_calibration()
+
+    def start_calibration(self):
+        """Start calibration."""
+        self.leds(self.LEDS_OFF)
+        self.ur.call("calibrate")
+
+    def ir_power(self, power):
+        """Set the IR emitter power (True or False)."""
+        self.ur.call("emitter", power)
+
+    def neopixel(self, led_nr, r, g, b):
+        """Control onboard NeoPixel LED (backend-specific)."""
+        self.ur.call("neopixel", led_nr, r, g, b)
+
+
+class LineSensorI2C(BaseLineSensor):
+    """LMS Line Sensor via I2C (MicroPython)."""
+
+    # I2C command constants (backend-specific)
+    CMD_GET_VERSION = 2
+    CMD_CALIBRATE = 4
+    CMD_LOAD_CAL = 6
+    CMD_SAVE_CAL = 7
+    CMD_GET_MIN = 8
+    CMD_GET_MAX = 9
+    CMD_NEOPIXEL = 12
+    CMD_LEDS = 13
+    CMD_SET_EMITTER = 14
+
+    def __init__(self, scl_pin=4, sda_pin=5, device_addr=51):
+        try:
+            from machine import I2C, Pin
+            from time import sleep, ticks_ms, ticks_diff
+            from collections import deque
+        except ImportError:
+            raise RuntimeError(
+                "LineSensorI2C requires machine, time, and collections modules. "
+                "Use LineSensorUR for Pybricks, which doesn't have these modules."
+            )
+
+        self.device_addr = device_addr
+        self.i2c = I2C(1, scl=Pin(scl_pin), sda=Pin(sda_pin))
+        self.pos_history = deque([(0, 0)] * 5, 5)
+        self.current_leds_mode = self.LEDS_OFF
+        self.save_start_time = 0
+        self.current_mode = self.MODE_CALIBRATED
+        self.last_mode = self.MODE_CALIBRATED
+        self.black_line = False
+        self.load_calibration()
+        self.mode_calibrated()
+        self.check_line_type()
+
+        # Store module references for later use in methods
+        self.sleep = sleep
+        self.ticks_ms = ticks_ms
+        self.ticks_diff = ticks_diff
+
+    def _read_all(self):
+        if self.current_mode < self.MODE_SAVING:
+            try:
+                return list(self.i2c.readfrom(self.device_addr, self.RAW_BYTES))
+            except:
+                return list(self.i2c.readfrom(self.device_addr, self.RAW_BYTES))
+
+        if self.current_mode == self.MODE_SAVING:
+            if self.ticks_diff(self.ticks_ms(), self.save_start_time + 1500) > 0:
+                self.write_command(self.last_mode)
+                self.current_mode = self.last_mode
+                print("Calibration stored in EEPROM")
+
+        return [0] * self.RAW_BYTES
+
+    def data(self, *indices):
+        """
+        Read sensor data from I2C with optional index-based filtering.
+
+        With no indices, this returns the raw 13-byte payload as a tuple.
+        With one index, this returns a single value directly.
+        With multiple indices, this returns a tuple in the same order as requested.
+
+        Example:
+            sensor.data(sensor.POSITION) -> -12
+            sensor.data(sensor.POSITION, sensor.SHAPE) -> (-12, '|')
+        """
+        raw = self._read_all()
+        return self._select_indices(raw, indices, invert_values=self.black_line)
 
     def write_command(self, command):
         """
@@ -234,78 +278,66 @@ class LineSensor:
         self.write_command((self.CMD_LEDS, self.LEDS_OFF))
         self.write_command(self.CMD_CALIBRATE)
 
-    def stop_calibration(self, save=True):
-        """Persist calibration values to the sensor EEPROM."""
-        # Firmware TODO: output 0 values while saving to avoid read timouts.
-        print("Stopping calibration, save new values:", save)
+    def save_calibration(self):
+        """Stop calibration and save values to EEPROM."""
+        print("Stopping calibration and saving new values")
         self.write_command(self.MODE_CALIBRATED)
-        self.write_command(self.current_rgb_mode)
+        self.write_command((self.CMD_LEDS, self.current_leds_mode))
         self.check_line_type()
         self.write_command(self.last_mode)
-        if save:
-            self.write_command(self.CMD_SAVE_CAL)
-            self.save_start_time = ticks_ms()
-            self.current_mode = self.MODE_SAVING
-        else:
-            self.current_mode = self.last_mode
-            
+        self.write_command(self.CMD_SAVE_CAL)
+        self.save_start_time = self.ticks_ms()
+        self.current_mode = self.MODE_SAVING
+
     def check_line_type(self):
         """Check if the line is black or white after calibration."""
-        # Firmware TODO: implement auto-inversion after calibration 
+        # Firmware TODO: implement auto-inversion after calibration
         values = list(self.i2c.readfrom(self.device_addr, 8))
         avg = sum(values) // len(values)
-        self.black_line = avg > 128 # Most sensors return white, lots of light.
+        self.black_line = avg > 128  # Most sensors return white, lots of light.
         print("Line is", "black" if self.black_line else "white")
 
-    def calibrate(self, duration=5, save=True):
+    def calibrate(self, duration=5):
         """
         Convenience method to calibrate for a certain duration and then save if desired.
-        
+
         Args:
             duration: Duration in seconds to run the calibration (default 5)
-            save: Whether to save the calibration values to EEPROM after calibration (default True)
+            Calibration is always saved to EEPROM after calibration.
         """
         self.start_calibration()
-        sleep(duration)
-        self.stop_calibration(save=save)
-        if save: 
-            sleep(1.5)
-            print("Calibration stored in EEPROM")
-            self.current_mode = self.last_mode
+        self.sleep(duration)
+        self.save_calibration()
+        self.sleep(1.5)
+        print("Calibration stored in EEPROM")
+        self.current_mode = self.last_mode
 
     def ir_power(self, power):
-        """Set the IR emitter power."""
-        # Firmware TODO: implement power levels for emitters, not just on/off.
+        """Set the IR emitter power (True or False)."""
         self.write_command((self.CMD_SET_EMITTER, 1 if power else 0))
 
-    def rgb_mode(self, mode):
-        """Set the onboard RGB LED mode."""
-        self.current_rgb_mode = mode
+    def leds(self, mode):
+        """Set LED display mode."""
+        self.current_leds_mode = mode
         self.write_command((self.CMD_LEDS, mode))
 
     def load_calibration(self):
-        """Load previously saved calibration values from EEPROM."""
+        """Load calibration values from EEPROM."""
         self.write_command(self.CMD_LOAD_CAL)
 
 
-# Example usage:
+# Example usage on LMS_ESP32
+# with the line sensor connected to I2C pins (GPIO 4 for SCL, GPIO 5 for SDA):
 if __name__ == "__main__":
-    # Initialize sensor
-    sensor = LineSensor()
+    from time import sleep
+
+    sensor = LineSensorI2C()
 
     sensor.ir_power(True)
+    sensor.leds(sensor.LEDS_VALUES)
 
-    # # # Optionally start calibration
-    # sensor.rgb_mode(sensor.LEDS_INVERTED)
-    # sensor.start_calibration()
-    # sleep(5)
-    # sensor.mode_calibrated()
-
-    sensor.rgb_mode(sensor.LEDS_VALUES)
-
-    # Read just light values
-    for i in range(1000):
-        # pos = sensor.position()
-        # der = sensor.position_derivative()
-        print(sensor.position_and_shape())
-        sleep(0.5)
+    # Read and display line position, derivative, and shape
+    for i in range(100):
+        pos, der, shape = sensor.position_derivative_shape()
+        print(f"Position: {pos}, Derivative: {der}, Shape: {shape}")
+        sleep(0.1)

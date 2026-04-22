@@ -1,26 +1,29 @@
 LMS Line Sensor
 ===============
 
-MicroPython driver documentation for the LMS Line Sensor.
+MicroPython and Pybricks driver documentation for the LMS Line Sensor.
 
 Installation
 ------------
 
-The package is distributed on PyPI for convenient versioning and packaging, but it is intended to run on MicroPython targets that provide the ``machine`` module.
+On the newest LMS-ESP32 firmware, the line sensor driver is pre-installed.
 
-Install the package locally:
+If you are on older firmware, install it with vipe-ide:
 
-.. code-block:: bash
+- Open the package manager in vipe-ide.
+- Choose custom package.
+- Paste the Git repository link for this project.
+- Install to the board.
 
-   pip install lms-line-sensor
+For Pybricks, upload both ``line_sensor.py`` and ``uremote.py`` into your Pybricks project/environment.
 
-If your deployment workflow copies modules to the board manually, transfer ``line_sensor.py`` from the installed package to your device filesystem.
+PyPI/pip installation is not part of the normal deployment flow for this project.
 
 Usage
 -----
 
-Micropython
-***********
+MicroPython with I2C
+********************
 
 Create a sensor instance by passing the I2C pin assignments and, if needed, a custom device address.
 
@@ -28,24 +31,44 @@ Create a sensor instance by passing the I2C pin assignments and, if needed, a cu
 
    from time import sleep
 
-   from line_sensor import LineSensor
+   from line_sensor import LineSensorI2C
 
-   sensor = LineSensor(scl_pin=4, sda_pin=5, device_addr=51)
-   sensor.ir_led_on()
-   sensor.load_calibration_from_rom()
+   sensor = LineSensorI2C(scl_pin=4, sda_pin=5, device_addr=51)
+   sensor.ir_power(True)
+   sensor.load_calibration()
    sensor.mode_calibrated()
 
    while True:
-       print(sensor.position(), sensor.position_derivative())
+       print(sensor.position(), sensor.derivative())
        sleep(0.1)
 
-Useful constants exposed by ``LineSensor`` include:
+Pybricks with uRemote
+*********************
+
+Create a sensor instance by passing the uRemote port.
+
+.. code-block:: python
+
+   from line_sensor import LineSensorUR
+   from pybricks.parameters import Port
+
+   sensor = LineSensorUR(Port.S1)
+   sensor.ir_power(True)
+   sensor.load_calibration()
+   sensor.mode_calibrated()
+
+   while True:
+       print(sensor.position(), sensor.derivative())
+       wait(100)
+
+Useful constants exposed by the sensor classes include:
 
 - ``MODE_RAW`` and ``MODE_CALIBRATED`` for acquisition mode selection.
-- ``LEDS_OFF``, ``LEDS_NORMAL``, ``LEDS_INVERTED``, and ``LEDS_POSITION`` for LED display modes.
+- ``LEDS_OFF``, ``LEDS_VALUES``, ``LEDS_VALUES_INVERTED``, ``LEDS_POSITION``, and ``LEDS_MAX`` for LED display modes.
 - ``POSITION``, ``MIN``, ``MAX``, ``DERIVATIVE``, and ``SHAPE`` for indexing values returned by ``data()``.
+- ``SHAPE_STRAIGHT``, ``SHAPE_T``, ``SHAPE_L_LEFT``, ``SHAPE_L_RIGHT``, ``SHAPE_Y``, and ``SHAPE_NONE`` for line shape constants.
 
-Microblocks
+MicroBlocks
 ***********
 
 Quick example program:

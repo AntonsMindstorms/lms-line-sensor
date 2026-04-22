@@ -3,71 +3,89 @@
 
 # LMS Line Sensor
 
-`lms-line-sensor` is a MicroPython and MicroBlocks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It communicates with the sensor over I2C and exposes a small API for reading raw or calibrated data, calibration management, and LED control.
+`lms-line-sensor` is a MicroPython and Pybricks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It provides two implementations: `LineSensorI2C` for direct I2C access on MicroPython devices, and `LineSensorUR` for remote access via Pybricks/uRemote. Both expose a unified API.
 
 </div>
 
 ## Features
 
 - Reads 8 light sensor channels in a single transfer.
-- Exposes position, derivative, and line shape.
+- Exposes position, derivative, and line shape via normalized API.
 - Supports raw and calibrated sensor modes.
-- Starts calibration and stores calibration values in EEPROM.
-- Controls the IR emitter and RGB LED display modes.
-- Aimed at ESP23 ([LMS-ESP32](https://www.antonsmindstorms.com/product/powerful-lms-esp32-board-for-spike-and-mindstorms/))
+- Calibration management with EEPROM persistence.
+- IR emitter and RGB LED control.
+- Aimed at ESP32 ([LMS-ESP32](https://www.antonsmindstorms.com/product/powerful-lms-esp32-board-for-spike-and-mindstorms/))
 
 ## Installation
 
-### Micropython Installation Using ViperIDE Package Manager (Recommended)
+### MicroPython on LMS-ESP32
 
-1. Open **ViperIDE** on your device
-2. Go to **Tools** → **Package Manager**
-3. Select **Install Package via Link**
-4. Enter the package link: `https://github.com/antonsmindstorms/lms-line-sensor.git`
-5. Follow the on-screen prompts to complete installation
+On the newest LMS-ESP32 firmware, the line sensor driver is pre-installed.
+
+If you are on older firmware, install it with vipe-ide:
+
+1. Open vipe-ide.
+2. Open the package manager.
+3. Choose custom package.
+4. Paste the Git repository link: `https://github.com/antonsmindstorms/lms-line-sensor.git`.
+5. Install to the board.
+
+### Pybricks Installation
+
+Upload both `line_sensor.py` and `uremote.py` into your Pybricks project/environment.
 
 ### MicroBlocks Installation
 
 Open a [microblocks editor](https://microblocks.fun/run/microblocks.html) and drag [LMS Line Sensor](<microblocks/LMS Line Sensor.ubl>) into the browser window.
 
-### Regular Python Installation
-
-This package targets MicroPython devices. For packaging and distribution it is published on PyPI, but it must run on hardware that provides the `machine` module.
-
-Install from PyPI:
-
-```bash
-pip install lms-line-sensor
-```
-
-Copy the installed `line_sensor.py` module to your MicroPython device if your deployment flow does not install packages directly on the board.
+PyPI/pip installation is not part of the normal deployment flow for this project.
 
 ## Quick Start
 
-### Micropython
+### MicroPython via I2C
 
 ```python
 from time import sleep
+from line_sensor import LineSensorI2C
 
-from line_sensor import LineSensor
+sensor = LineSensorI2C(scl_pin=4, sda_pin=5, device_addr=51)
 
-sensor = LineSensor(scl_pin=4, sda_pin=5, device_addr=51)
-
-sensor.ir_led_on()
-sensor.load_calibration_from_rom()
+sensor.ir_power(True)
+sensor.load_calibration()
 sensor.mode_calibrated()
 
 while True:
     position = sensor.position()
-    derivative = sensor.position_derivative()
+    derivative = sensor.derivative()
+    pds = sensor.position_derivative_shape()
     print(position, derivative)
+    print(pds)
     sleep(0.1)
 ```
 
-### Microblocks
+### Pybricks via uRemote
+
+```python
+from line_sensor import LineSensorUR
+
+sensor = LineSensorUR(port=1)
+
+sensor.ir_power(True)
+sensor.load_calibration()
+sensor.mode_calibrated()
+
+while True:
+    position = sensor.position()
+    derivative = sensor.derivative()
+    pds = sensor.position_derivative_shape()
+    print(position, derivative)
+    print(pds)
+```
+
+### MicroBlocks
 
 Here's a simple program that reads the line shape and distance from center.
-Shape is an ASCII character in the shape of the line: 
+Shape is an ASCII character in the shape of the line:
 
 ```ascii
 SHAPE_NONE     = ' ',
@@ -82,22 +100,29 @@ SHAPE_Y        = 'Y'
 
 ## API Overview
 
-### `LineSensor`
+Both `LineSensorI2C` and `LineSensorUR` expose the same core API:
 
-The `LineSensor` class provides the public API.
-
-- `light_values()` returns the 8 raw light sensor values.
-- `data(*indices)` returns the full 13-byte response or selected entries.
-- `position()` returns the current line position.
-- `position_derivative()` returns the derivative of the line position.
-- `shape()` returns the sensor-reported shape metric.
+- `position()` returns the current line position (-128 to 127, where 0 is center).
+- `derivative()` returns the derivative of the line position.
+- `shape()` returns the sensor-reported shape as an ASCII character.
+- `sensors()` returns the 8 raw or calibrated sensor values.
+- `position_derivative_shape()` returns a tuple of (position, derivative, shape).
+- `data(*indices)` returns the full 13-byte response or selected entries by index constant.
 - `mode_raw()` switches to raw reading mode.
 - `mode_calibrated()` switches to calibrated reading mode.
-- `start_calibration()` starts sensor calibration.
-- `ir_led_on()` and `ir_led_off()` control the IR emitter.
-- `rgb_led_mode(mode)` changes the RGB LED display mode.
-- `save_calibration_in_rom()` stores calibration data in EEPROM.
-- `load_calibration_from_rom()` loads calibration data from EEPROM.
+- `calibrate(duration=5)` calibrates the sensor and saves calibration to EEPROM.
+- `ir_power(True/False)` controls the IR emitter.
+- `leds(mode)` changes the LED display mode.
+- `save_calibration()` stores calibration data in EEPROM.
+- `load_calibration()` loads calibration data from EEPROM.
+
+### I2C-Specific Features
+
+`LineSensorI2C` also provides:
+
+- `position_derivative_shape()` returns a tuple of (position, derivative, shape).
+- `check_line_type()` auto-detects black vs white line for value inversion.
+- `start_calibration()` and `save_calibration()` for fine-grained calibration control.
 
 ## Documentation
 
@@ -112,7 +137,7 @@ sphinx-build -b html docs docs/_build/html
 - Source module: `micropython/line_sensor.py`
 - API docs entry point: `docs/index.rst`
 - The Sphinx configuration mocks the MicroPython `machine` module so docs can be built on desktop Python.
-- Submit update to Pypi:
+- Submit update to PyPI:
   - Update version in [line sensor.py](micropython/line_sensor.py)
   - Update version in [package.json](package.json)
   - Activate venv
