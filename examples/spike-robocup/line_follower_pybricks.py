@@ -13,11 +13,11 @@ pr.add_channel('lines', 'bbB')
 pr.add_command('calib', from_hub_fmt='b')
 w = StopWatch()
 
-FACTOR = 1.2 # Increase with multiples of .1 to make the robot go faster.
-BASE_DC = 35 * FACTOR
-D_BRAKE = 1.3
-KP = 0.35 * FACTOR
-KD = 0.55 * FACTOR
+FACTOR = 1 # Increase with multiples of .1 to make the robot go faster.
+BASE_DC = 30 * FACTOR
+D_BRAKE = 0.04
+KP = -0.25 * FACTOR
+KD = -0.06 * FACTOR
 FOLLOW = 0
 COUNTDOWN = 1
 CALIBRATE = 2
