@@ -3,7 +3,7 @@
 
 # LMS Line Sensor
 
-`lms-line-sensor` is a MicroPython and Pybricks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It provides two implementations: `LineSensorI2C` for direct I2C access on MicroPython devices, and `LineSensorUR` for remote access via Pybricks/uRemote. Both expose a unified API.
+`lms-line-sensor` is a MicroPython and Pybricks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It provides two implementations: `LineSensorI2C` for direct I2C access on MicroPython devices, and `LineSensorUR` for remote access via Pybricks and [uRemote](https://github.com/AntonsMindstorms/uRemote). Both expose a unified API.
 
 </div>
 
@@ -32,7 +32,7 @@ If you are on older firmware, install it with vipe-ide:
 
 ### Pybricks Installation
 
-Upload both `line_sensor.py` and `uremote.py` into your Pybricks project/environment.
+Upload `line_sensor.py` and [`uremote.py`](https://github.com/AntonsMindstorms/uRemote/blob/main/library/uremote.py) from [uRemote](https://github.com/AntonsMindstorms/uRemote) into your Pybricks project/environment.
 
 ### MicroBlocks Installation
 

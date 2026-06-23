@@ -15,7 +15,7 @@ If you are on older firmware, install it with vipe-ide:
 - Paste the Git repository link for this project.
 - Install to the board.
 
-For Pybricks, upload both ``line_sensor.py`` and ``uremote.py`` into your Pybricks project/environment.
+For Pybricks, upload both ``line_sensor.py`` and ``uremote.py`` from `uRemote <https://github.com/AntonsMindstorms/uRemote>`_ into your Pybricks project/environment.
 
 PyPI/pip installation is not part of the normal deployment flow for this project.
 
@@ -44,6 +44,8 @@ Create a sensor instance by passing the I2C pin assignments and, if needed, a cu
 
 Pybricks with uRemote
 *********************
+
+`uRemote <https://github.com/AntonsMindstorms/uRemote>`_ provides UART RPC between the Pybricks hub and LMS-ESP32.
 
 Create a sensor instance by passing the uRemote port.
 
