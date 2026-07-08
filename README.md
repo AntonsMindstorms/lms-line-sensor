@@ -32,7 +32,7 @@ If you are on older firmware, install it with vipe-ide:
 
 ### Pybricks Installation
 
-Upload `line_sensor.py` and [`uremote.py`](https://github.com/AntonsMindstorms/uRemote/blob/main/library/uremote.py) from [uRemote](https://github.com/AntonsMindstorms/uRemote) into your Pybricks project/environment.
+Upload `line_sensor_pybricks.py` into your Pybricks project/environment.
 
 ### MicroBlocks Installation
 
@@ -66,7 +66,7 @@ while True:
 ### Pybricks via uRemote
 
 ```python
-from line_sensor import LineSensorUR
+from line_sensor_pybricks import LineSensorUR
 
 sensor = LineSensorUR(port=1)
 
@@ -134,11 +134,13 @@ sphinx-build -b html docs docs/_build/html
 
 ## Development Notes
 
-- Source module: `micropython/line_sensor.py`
+- Main package source: `micropython/line_sensor/`
+- Pybricks bundle sources: `tools/pybricks_bundle/`
+- Generated Pybricks standalone module: `micropython/line_sensor_pybricks.py`
 - API docs entry point: `docs/index.rst`
 - The Sphinx configuration mocks the MicroPython `machine` module so docs can be built on desktop Python.
 - Submit update to PyPI:
-  - Update version in [line sensor.py](micropython/line_sensor.py)
+  - Update version in [base.py](micropython/line_sensor/base.py)
   - Update version in [package.json](package.json)
   - Activate venv
   - `rm -rf ./dist && python -m build && twine upload dist/*`

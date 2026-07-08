@@ -3,7 +3,7 @@
 from pybricks.hubs import EV3Brick
 from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
 from pybricks.ev3devices import Motor
-from line_sensor import LineSensorUR as LineSensor
+from line_sensor_pybricks import LineSensorUR as LineSensor
 hub = EV3Brick()
 
 mb=Motor(Port.B, Direction.COUNTERCLOCKWISE)

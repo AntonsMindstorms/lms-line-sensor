@@ -15,7 +15,7 @@ If you are on older firmware, install it with vipe-ide:
 - Paste the Git repository link for this project.
 - Install to the board.
 
-For Pybricks, upload both ``line_sensor.py`` and ``uremote.py`` from `uRemote <https://github.com/AntonsMindstorms/uRemote>`_ into your Pybricks project/environment.
+For Pybricks, upload the generated standalone file ``line_sensor_pybricks.py`` into your Pybricks project/environment.
 
 PyPI/pip installation is not part of the normal deployment flow for this project.
 
@@ -51,7 +51,7 @@ Create a sensor instance by passing the uRemote port.
 
 .. code-block:: python
 
-   from line_sensor import LineSensorUR
+   from line_sensor_pybricks import LineSensorUR
    from pybricks.parameters import Port
 
    sensor = LineSensorUR(Port.S1)

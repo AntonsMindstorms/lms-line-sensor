@@ -24,7 +24,7 @@ classifiers = [
 docs = ["sphinx>=7,<9"]
 
 [tool.setuptools]
-py-modules = ["line_sensor", "_version"]
+packages = ["line_sensor", "vendor"]
 license-files = ["LICENSE"]
 
 [tool.setuptools.dynamic]

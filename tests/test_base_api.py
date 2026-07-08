@@ -1,23 +1,43 @@
-"""
-Test suite for the LMS Line Sensor base API contract.
-
-This tests the shared API surface exposed by both LineSensorI2C and LineSensorUR,
-ensuring consistent method names, return types, and constant values across backends.
-"""
+"""Tests for the LMS Line Sensor package and standalone Pybricks artifact."""
 
 import sys
-from unittest.mock import MagicMock, patch
+import types
+from pathlib import Path
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-# Mock MicroPython imports before importing the module
-sys.modules["machine"] = MagicMock()
-sys.modules["time"] = MagicMock()
-sys.modules["collections"] = MagicMock()
-sys.modules["uremote"] = MagicMock()
-sys.modules["pybricks"] = MagicMock()
-sys.modules["pybricks.tools"] = MagicMock()
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MICROPYTHON_DIR = REPO_ROOT / "micropython"
+if str(MICROPYTHON_DIR) not in sys.path:
+    sys.path.insert(0, str(MICROPYTHON_DIR))
 
-# Now import the module
-from micropython import line_sensor
+machine_module = types.ModuleType("machine")
+machine_module.I2C = MagicMock()
+machine_module.Pin = MagicMock()
+sys.modules["machine"] = machine_module
+
+time_module = types.ModuleType("time")
+time_module.sleep = MagicMock()
+time_module.ticks_ms = MagicMock(return_value=0)
+time_module.ticks_diff = MagicMock(return_value=1)
+time_module.sleep_ms = MagicMock()
+sys.modules["time"] = time_module
+
+pybricks_module = types.ModuleType("pybricks")
+pybricks_tools = types.ModuleType("pybricks.tools")
+pybricks_tools.wait = MagicMock()
+pybricks_tools.StopWatch = MagicMock()
+pybricks_iodevices = types.ModuleType("pybricks.iodevices")
+pybricks_iodevices.UARTDevice = MagicMock()
+pybricks_parameters = types.ModuleType("pybricks.parameters")
+pybricks_parameters.Port = MagicMock()
+sys.modules["pybricks"] = pybricks_module
+sys.modules["pybricks.tools"] = pybricks_tools
+sys.modules["pybricks.iodevices"] = pybricks_iodevices
+sys.modules["pybricks.parameters"] = pybricks_parameters
+
+import line_sensor
+import line_sensor_pybricks
 
 
 class TestBaseLineSensorConstants:
@@ -99,23 +119,13 @@ class TestLineSensorI2CDataProcessing:
 
     def setup_method(self):
         """Set up a mocked LineSensorI2C instance for testing."""
-        # Mock I2C and Pin
-        with patch("micropython.line_sensor.I2C"), patch(
-            "micropython.line_sensor.Pin"
-        ), patch("micropython.line_sensor.ticks_ms", return_value=0), patch(
-            "micropython.line_sensor.ticks_diff", return_value=1
-        ), patch.object(
-            line_sensor.LineSensorI2C, "load_calibration"
-        ), patch.object(
+        with patch.object(line_sensor.LineSensorI2C, "load_calibration"), patch.object(
             line_sensor.LineSensorI2C, "mode_calibrated"
-        ), patch.object(
-            line_sensor.LineSensorI2C, "check_line_type"
-        ):
+        ), patch.object(line_sensor.LineSensorI2C, "check_line_type"):
             self.sensor = line_sensor.LineSensorI2C()
-
-        # Manually set the i2c mock
         self.sensor.i2c = MagicMock()
         self.sensor.current_mode = self.sensor.MODE_CALIBRATED
+        self.sensor.black_line = False
 
     def test_position_returns_scalar(self):
         """Verify position() returns a scalar, not a list."""
@@ -183,7 +193,7 @@ class TestLineSensorI2CDataProcessing:
         assert result == "|", f"Expected shape '|', got '{result}'"
 
     def test_sensors_returns_list_of_8(self):
-        """Verify sensors() returns a list of 8 values."""
+        """Verify sensors() returns a tuple of 8 values."""
         self.sensor.i2c.readfrom.return_value = [
             10,
             20,
@@ -200,9 +210,9 @@ class TestLineSensorI2CDataProcessing:
             124,
         ]
         result = self.sensor.sensors()
-        assert isinstance(result, list), f"Expected list, got {type(result)}"
+        assert isinstance(result, tuple), f"Expected tuple, got {type(result)}"
         assert len(result) == 8, f"Expected 8 values, got {len(result)}"
-        assert result == [10, 20, 30, 40, 50, 60, 70, 80]
+        assert result == (10, 20, 30, 40, 50, 60, 70, 80)
 
     def test_position_offset_applied(self):
         """Verify position offset (-128) is applied to raw byte."""
@@ -247,7 +257,7 @@ class TestLineSensorI2CDataProcessing:
         raw_data = [10, 20, 30, 40, 50, 60, 70, 80, 128, 0, 200, 128, 124]
         self.sensor.i2c.readfrom.return_value = raw_data
         result = self.sensor.data()
-        assert result == raw_data, f"Expected {raw_data}, got {result}"
+        assert result == tuple(raw_data), f"Expected {tuple(raw_data)}, got {result}"
 
     def test_data_with_indices_applies_offset_and_chr(self):
         """Verify data(*indices) applies offset and chr conversion correctly."""
@@ -269,7 +279,7 @@ class TestLineSensorI2CDataProcessing:
 
         # Request position and shape
         result = self.sensor.data(self.sensor.POSITION, self.sensor.SHAPE)
-        assert result == [0, "T"], f"Expected [0, 'T'], got {result}"
+        assert result == (0, "T"), f"Expected (0, 'T'), got {result}"
 
     def test_black_line_value_inversion(self):
         """Verify values are inverted when black_line is True."""
@@ -280,13 +290,27 @@ class TestLineSensorI2CDataProcessing:
 
         # Normal (white line)
         result = self.sensor.sensors()
-        assert result == [10, 20, 30, 40, 50, 60, 70, 80]
+        assert result == (10, 20, 30, 40, 50, 60, 70, 80)
 
         # Black line (inverted: 255 - value)
         self.sensor.black_line = True
         result = self.sensor.sensors()
-        expected = [255 - v for v in [10, 20, 30, 40, 50, 60, 70, 80]]
+        expected = tuple(255 - v for v in [10, 20, 30, 40, 50, 60, 70, 80])
         assert result == expected, f"Expected {expected}, got {result}"
+
+
+class TestPackageLayout:
+    """Verify the split package and standalone Pybricks file expose expected symbols."""
+
+    def test_package_exports_main_classes(self):
+        assert hasattr(line_sensor, "BaseLineSensor")
+        assert hasattr(line_sensor, "LineSensorI2C")
+        assert hasattr(line_sensor, "LineSensorUR")
+
+    def test_pybricks_standalone_exports_line_sensor_ur(self):
+        assert hasattr(line_sensor_pybricks, "LineSensorUR")
+        assert hasattr(line_sensor_pybricks, "uRemote")
+        assert hasattr(line_sensor_pybricks, "uRemoteError")
 
 
 class TestSharedAPISignatures:
@@ -342,6 +366,7 @@ if __name__ == "__main__":
     test_classes = [
         TestBaseLineSensorConstants,
         TestLineSensorI2CDataProcessing,
+        TestPackageLayout,
         TestSharedAPISignatures,
     ]
 
