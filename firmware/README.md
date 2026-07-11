@@ -15,7 +15,7 @@ Use the 2x3 header to connect the Line Sensor board to your EV3 hub (using the L
 
 * connect the Line Sensor Board with USB to your PC
 * Press the RESET button twice in quick succession.
-* A UF2 Mass storage with name \*\*CH32V UF2\*\* device should appear in the File Manager of your PC
+* A UF2 Mass storage with name **CH32V UF2** device should appear in the File Manager of your PC
 * Select the I2C or uRemote UF2 firmware file and drag it into the UF2 
 
 
