@@ -2,7 +2,6 @@
 
 Firmware reference: **3.87**  
 Default I2C slave address: **`0x33`**  
-Test-build address: **`0x34`**  
 Sensor channels: **8**
 
 This document describes the I2C protocol implemented by the LMS line-sensor firmware and gives MicroPython examples for an ESP32 acting as the I2C controller.
@@ -13,7 +12,7 @@ The line sensor is an I2C slave. The ESP32 is the I2C controller.
 
 - Use a common ground between the ESP32 and the line sensor.
 - Use the logic voltage required by the sensor board. ESP32 GPIO is 3.3 V only.
-- SDA and SCL require pull-up resistors if the boards do not already provide them.
+- No pull-up resitors are needed on SDA and SCL.
 - The firmware uses 7-bit I2C address `0x33` unless compiled with `TEST_VERSION`, in which case it uses `0x34`.
 
 Example ESP32 initialization:
@@ -23,7 +22,7 @@ from machine import I2C, Pin
 
 # Change the pins to match your ESP32 board and wiring.
 i2c = I2C(
-    0,
+    1,
     scl=Pin(4),
     sda=Pin(5),
     freq=100_000,
@@ -105,7 +104,7 @@ Every normal measurement read returns 13 bytes.
 
 ### Position encoding
 
-Convert the position byte to a signed value with:
+A weighted position is calculated based on the signals measure by the 8 sensors. Convert the position byte to a signed value with:
 
 ```python
 signed_position = frame[8] - 128
@@ -123,7 +122,7 @@ When no usable line is detected, the firmware also returns position `128`. Check
 
 ### Derivative encoding
 
-The derivative is centered at 128:
+A derivative of the position is determined by taking the running avergae of the differences of the last 5 positions. This value is scaled. The derivative is centered at 128:
 
 ```python
 signed_derivative = frame[11] - 128
@@ -443,205 +442,10 @@ Response: 12 UID bytes
 
 Each 32-bit UID word is serialized least-significant byte first. A convenient display form is a 24-character hexadecimal string.
 
-## 6. ESP32 MicroPython driver
 
-The following small driver covers normal sensor use and all general command patterns.
+## 6. Usage examples
 
-```python
-from time import sleep_ms, sleep_us
-
-
-class LMSLineSensorI2C:
-    ADDRESS = 0x33
-    FRAME_LENGTH = 13
-    SENSOR_COUNT = 8
-
-    CMD_SET_MODE_RAW = 0
-    CMD_SET_MODE_CAL = 1
-    CMD_GET_VERSION = 2
-    CMD_DEBUG = 3
-    CMD_CALIBRATE = 4
-    CMD_IS_CALIBRATED = 5
-    CMD_LOAD_CAL = 6
-    CMD_SAVE_CAL = 7
-    CMD_GET_MIN = 8
-    CMD_GET_MAX = 9
-    CMD_SET_MIN = 10
-    CMD_SET_MAX = 11
-    CMD_NEOPIXEL = 12
-    CMD_LEDS = 13
-    CMD_SET_EMITTER = 14
-    CMD_GET_VALUE = 15
-    CMD_SET_VALUE = 16
-    CMD_SHOW_CONFIG = 17
-    CMD_LOAD_CONFIG = 18
-    CMD_SAVE_CONFIG = 19
-    CMD_GPIO_OUT = 20
-    CMD_GPIO_IN = 21
-    CMD_SERIAL_DISABLE = 22
-    CMD_SERIAL_ENABLE = 23
-    CMD_GET_UID = 24
-
-    LEDS_OFF = 0
-    LEDS_NORMAL = 1
-    LEDS_INVERTED = 2
-    LEDS_POSITION = 3
-
-    CONFIG_MAJ_VERSION = 0
-    CONFIG_MIN_VERSION = 1
-    CONFIG_LOAD_CAL_STARTUP = 2
-    CONFIG_CAL_DURATION = 3
-    CONFIG_SHAPE_THRESHOLD_BLACK = 4
-    CONFIG_IR_POWER = 5
-
-    def __init__(self, i2c, address=ADDRESS, command_delay_us=300):
-        self.i2c = i2c
-        self.address = address
-        self.command_delay_us = command_delay_us
-
-    @staticmethod
-    def _byte(value):
-        value = int(value)
-        if not 0 <= value <= 255:
-            raise ValueError("byte value must be in range 0..255")
-        return value
-
-    def write_command(self, command, *arguments):
-        packet = bytes(
-            [self._byte(command)]
-            + [self._byte(value) for value in arguments]
-        )
-        self.i2c.writeto(self.address, packet)
-
-    def query(self, command, response_length, *arguments):
-        self.write_command(command, *arguments)
-        sleep_us(self.command_delay_us)
-        return self.i2c.readfrom(self.address, response_length)
-
-    def read_frame(self):
-        data = self.i2c.readfrom(self.address, self.FRAME_LENGTH)
-        if len(data) != self.FRAME_LENGTH:
-            raise OSError("expected a 13-byte sensor frame")
-
-        return {
-            "sensors": tuple(data[0:8]),
-            "position_byte": data[8],
-            "position": data[8] - 128,
-            "minimum": data[9],
-            "maximum": data[10],
-            "derivative_byte": data[11],
-            "derivative": data[11] - 128,
-            "shape_byte": data[12],
-            "shape": chr(data[12]),
-            "line_detected": data[12] != ord(" "),
-            "raw": data,
-        }
-
-    def set_raw_mode(self):
-        self.write_command(self.CMD_SET_MODE_RAW)
-
-    def set_calibrated_mode(self):
-        self.write_command(self.CMD_SET_MODE_CAL)
-
-    def get_version(self):
-        data = self.query(self.CMD_GET_VERSION, self.FRAME_LENGTH)
-        return data[0], data[1]
-
-    def is_calibrated(self):
-        return bool(self.query(
-            self.CMD_IS_CALIBRATED,
-            self.FRAME_LENGTH,
-        )[0])
-
-    def calibrate(self, save=False):
-        self.write_command(self.CMD_CALIBRATE, 1 if save else 0)
-
-    def load_calibration(self):
-        self.write_command(self.CMD_LOAD_CAL)
-
-    def save_calibration(self):
-        self.write_command(self.CMD_SAVE_CAL)
-
-    def get_calibration_minimum(self):
-        return tuple(self.query(
-            self.CMD_GET_MIN,
-            self.FRAME_LENGTH,
-        )[0:8])
-
-    def get_calibration_maximum(self):
-        return tuple(self.query(
-            self.CMD_GET_MAX,
-            self.FRAME_LENGTH,
-        )[0:8])
-
-    def set_calibration_minimum(self, values):
-        values = tuple(values)
-        if len(values) != self.SENSOR_COUNT:
-            raise ValueError("exactly eight minimum values are required")
-        self.write_command(self.CMD_SET_MIN, *values)
-
-    def set_calibration_maximum(self, values):
-        values = tuple(values)
-        if len(values) != self.SENSOR_COUNT:
-            raise ValueError("exactly eight maximum values are required")
-        self.write_command(self.CMD_SET_MAX, *values)
-
-    def set_led_mode(self, mode):
-        if mode not in range(4):
-            raise ValueError("LED mode must be 0..3")
-        self.write_command(self.CMD_LEDS, mode)
-
-    def set_neopixel(self, index, red, green, blue):
-        self.write_command(
-            self.CMD_NEOPIXEL,
-            index,
-            red,
-            green,
-            blue,
-        )
-
-    def set_emitter(self, enabled):
-        self.write_command(self.CMD_SET_EMITTER, 1 if enabled else 0)
-
-    def get_config(self, index):
-        return self.query(
-            self.CMD_GET_VALUE,
-            self.FRAME_LENGTH,
-            index,
-        )[0]
-
-    def set_config(self, index, value):
-        self.write_command(self.CMD_SET_VALUE, index, value)
-
-    def gpio_write(self, logical_pin, value):
-        self.write_command(
-            self.CMD_GPIO_OUT,
-            logical_pin,
-            1 if value else 0,
-        )
-
-    def gpio_read(self, logical_pin):
-        value = self.query(self.CMD_GPIO_IN, 1, logical_pin)[0]
-        if value == 0xFF:
-            raise ValueError("invalid logical GPIO pin")
-        return value
-
-    def disable_serial(self):
-        return self.query(self.CMD_SERIAL_DISABLE, 1)[0] == 1
-
-    def enable_serial(self):
-        return self.query(self.CMD_SERIAL_ENABLE, 1)[0] == 1
-
-    def get_uid(self):
-        return self.query(self.CMD_GET_UID, 12)
-
-    def get_uid_hex(self):
-        return "".join("{:02x}".format(value) for value in self.get_uid())
-```
-
-## 7. Usage examples
-
-### 7.1 Read raw detector values
+### 6.1 Read raw detector values
 
 ```python
 from machine import I2C, Pin
@@ -664,7 +468,7 @@ while True:
     sleep_ms(50)
 ```
 
-### 7.2 Calibrate, save, and use normalized values
+### 6.2 Calibrate, save, and use normalized values
 
 ```python
 from machine import I2C, Pin
@@ -705,7 +509,7 @@ sensor.calibrate(save=True)
 sleep_ms((seconds * 1000) + 250)
 ```
 
-### 7.3 Load saved calibration at startup
+### 6.3 Load saved calibration at startup
 
 ```python
 sensor.load_calibration()
@@ -725,7 +529,7 @@ sensor.set_config(sensor.CONFIG_LOAD_CAL_STARTUP, 1)
 
 `SET_VALUE` already schedules the updated configuration for saving.
 
-### 7.4 Change shape threshold
+### 6.4 Change shape threshold
 
 ```python
 old_threshold = sensor.get_config(sensor.CONFIG_SHAPE_THRESHOLD_BLACK)
@@ -737,7 +541,7 @@ print("new shape threshold:", sensor.get_config(
 ))
 ```
 
-### 7.5 Set an individual NeoPixel
+### 6.5 Set an individual NeoPixel
 
 ```python
 # Set detector pixel 0 to dim blue.
@@ -746,13 +550,13 @@ sensor.set_neopixel(0, 0, 0, 20)
 
 Automatic LED modes can overwrite manually set colors on later firmware loop iterations.
 
-### 7.6 Read the device UID
+### 6.6 Read the device UID
 
 ```python
 print("UID:", sensor.get_uid_hex())
 ```
 
-### 7.7 Simple proportional line follower value
+### 6.7 Simple proportional line follower value
 
 This example calculates a steering correction only. Motor control is application-specific.
 
@@ -768,25 +572,3 @@ if frame["line_detected"]:
 else:
     print("stop or search for the line")
 ```
-
-## 8. Firmware 3.87 implementation notes
-
-### Two response mechanisms are present
-
-Commands `21` through `24` prepare `replyBuf` and return that data from `RequestEvent()`. This is the conventional and reliable write-command-then-read mechanism.
-
-Commands `2`, `5`, `8`, `9`, and `15` call `Wire.write()` directly from `ReceiveEvent()` and intend to return a padded 13-byte response. Whether that works exactly as intended can depend on the CH32 Arduino `Wire` implementation. On I2C slave implementations that require all transmitted data to be supplied from the request callback, the subsequent read may return the current 13-byte measurement frame instead.
-
-A robust firmware cleanup would make every query command fill `replyBuf`, set `replyLen`, and set `replyPending`, just as `GET_UID` and `GPIO_IN` already do.
-
-### EEPROM commands are asynchronous
-
-`LOAD_CAL`, `SAVE_CAL`, `SET_VALUE`, and `SAVE_CONFIG` schedule work that is performed by the main loop. Do not issue dependent commands back-to-back without a small delay.
-
-### Calibration completion
-
-`IS_CALIBRATED` reports that usable calibration values exist; it does not report that the timed calibration procedure has ended. Wait for the configured calibration duration before selecting calibrated mode or starting normal operation.
-
-### No acknowledgement for most writes
-
-Most write-only commands have no explicit success response. The controller must validate state through a related read, where one exists.
