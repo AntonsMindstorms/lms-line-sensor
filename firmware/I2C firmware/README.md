@@ -24,8 +24,8 @@ from machine import I2C, Pin
 # Change the pins to match your ESP32 board and wiring.
 i2c = I2C(
     0,
-    scl=Pin(22),
-    sda=Pin(21),
+    scl=Pin(4),
+    sda=Pin(5),
     freq=100_000,
 )
 
@@ -648,7 +648,7 @@ from machine import I2C, Pin
 from time import sleep_ms
 
 # Paste/import LMSLineSensorI2C before running this example.
-i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100_000)
+i2c = I2C(0, scl=Pin(4), sda=Pin(5), freq=100_000)
 sensor = LMSLineSensorI2C(i2c)
 
 sensor.set_raw_mode()
@@ -672,7 +672,7 @@ from time import sleep_ms
 
 CALIBRATION_SECONDS = 7
 
-i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100_000)
+i2c = I2C(0, scl=Pin(4), sda=Pin(5), freq=100_000)
 sensor = LMSLineSensorI2C(i2c)
 
 # Move the line/background across all eight detectors during this period.
