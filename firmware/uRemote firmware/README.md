@@ -1267,7 +1267,4 @@ For low-latency control loops, use a shorter receive timeout and stop the motors
 
 ## 15. References
 
-- Supplied source: `LineSensor(1).ino`, LMS Line Sensor uRemote firmware 5.4.
 - uRemote project: <https://github.com/AntonsMindstorms/uRemote>
-- LMS Line Sensor project: <https://github.com/AntonsMindstorms/lms-line-sensor>
-- Pybricks `UARTDevice`: <https://docs.pybricks.com/en/stable/iodevices/uartdevice.html>
