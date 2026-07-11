@@ -1,4 +1,4 @@
-\# Firmware for LMS Line Sensor
+# Firmware for LMS Line Sensor
 
 
 
@@ -11,7 +11,7 @@ Use the 2x3 header to connect the Line Sensor board to your EV3 hub (using the L
 
 
 
-\## How to flash firmware on the Line Sensor board?
+## How to flash firmware on the Line Sensor board?
 
 * connect the Line Sensor Board with USB to your PC
 * Press the RESET button twice in quick succession.
