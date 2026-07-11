@@ -1049,7 +1049,7 @@ print(":".join("{:02X}".format(value) for value in uid))
 
 ---
 
-## 14. Firmware-specific observations
+## 12. Firmware-specific observations
 
 - Firmware version is `5.4`.
 - The uRemote UART is `SerialA` at 115200 baud.
@@ -1064,6 +1064,6 @@ print(":".join("{:02X}".format(value) for value in uid))
 
 ---
 
-## 15. References
+## 13. References
 
 - uRemote project: <https://github.com/AntonsMindstorms/uRemote>
