@@ -72,16 +72,6 @@ class BaseLineSensor:
         return tuple(out)
 
     @staticmethod
-    def _first(value, default=None):
-        if value is None:
-            return default
-        if isinstance(value, (list, tuple)):
-            return value[0] if value else default
-        if isinstance(value, (bytes, bytearray)):
-            return value[0] if value else default
-        return value
-
-    @staticmethod
     def _bytes_tuple(value):
         if value is None:
             return ()
@@ -93,30 +83,51 @@ class BaseLineSensor:
             return tuple(value)
         return (value,)
 
-    def data(self, *indices):
-        """Implemented in subclasses."""
-        raise RuntimeError("Subclasses must implement data().")
+    def _require_sensor_count(self, values, method_name):
+        if len(values) != self.SENSOR_COUNT:
+            raise ValueError(method_name + " needs 8 values")
 
-    def mode_raw(self):
-        raise RuntimeError("Subclasses must implement mode_raw().")
+    def set_calibration(self, minimum, maximum):
+        """Set calibration min and max arrays."""
+        self.set_min(minimum)
+        return self.set_max(maximum)
 
-    def mode_calibrated(self):
-        raise RuntimeError("Subclasses must implement mode_calibrated().")
+    def get_config(self):
+        """Return config as a dictionary."""
+        raw = self.show_config()
+        names = (
+            "maj_version",
+            "min_version",
+            "load_cal_startup",
+            "cal_duration",
+            "shape_threshold_black",
+            "ir_power",
+            "crc",
+        )
+        result = {}
+        for index, name in enumerate(names):
+            result[name] = raw[index] if index < len(raw) else None
+        return result
 
-    def calibrate(self, duration=5):
-        raise RuntimeError("Subclasses must implement calibrate().")
+    def uid_hex(self):
+        """[pybricks:omit] Return CH32V203 UID as a hex string."""
+        return "".join("%02x" % byte for byte in self.get_uid())
 
-    def load_calibration(self):
-        raise RuntimeError("Subclasses must implement load_calibration().")
+    def set_load_cal_startup(self, calibrated=True):
+        """Configure whether calibration is loaded during firmware startup."""
+        return self.set_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
 
-    def save_calibration(self):
-        raise RuntimeError("Subclasses must implement save_calibration().")
+    def set_cal_duration(self, seconds):
+        """Set firmware calibration duration in seconds."""
+        return self.set_value(self.CONFIG_CAL_DURATION, seconds)
 
-    def ir_power(self, power):
-        raise RuntimeError("Subclasses must implement ir_power().")
+    def set_shape_threshold_black(self, threshold):
+        """Set the shape-detection black threshold."""
+        return self.set_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
 
-    def leds(self, mode):
-        raise RuntimeError("Subclasses must implement leds().")
+    def set_ir_emitter_startup(self, emitter=True):
+        """Configure emitter state after firmware startup."""
+        return self.set_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
 
     def sensors(self):
         """Read the 8 sensor channel values."""
@@ -141,3 +152,11 @@ class BaseLineSensor:
     def position_derivative_shape(self):
         """Read line position, derivative, and shape."""
         return self.data(self.POSITION, self.DERIVATIVE, self.SHAPE)
+
+    def mode_calibrated(self):
+        """Set sensor to calibrated mode."""
+        return self.mode(self.MODE_CALIBRATED)
+
+    def mode_raw(self):
+        """Set sensor to raw mode."""
+        return self.mode(self.MODE_RAW)

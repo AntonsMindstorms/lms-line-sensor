@@ -6,39 +6,41 @@ Do not edit by hand. Regenerate with:
 
 __all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']
 
-"""Base API for the standalone Pybricks bundle."""
-
-__version__ = "0.3.0"
-
+"""Shared API and constants for LMS line sensor drivers."""
+__version__ = '0.3.0'
 
 class BaseLineSensor:
+    """Base class for LMS Line Sensor implementations."""
     RAW_BYTES = 13
     SENSOR_COUNT = 8
-
     MODE_RAW = 0
     MODE_CALIBRATED = 1
-
     POSITION = 8
     DERIVATIVE = 11
     SHAPE = 12
     VALUES = -1
-
     LEDS_OFF = 0
     LEDS_VALUES = 1
     LEDS_VALUES_INVERTED = 2
     LEDS_POSITION = 3
     LEDS_MAX = 4
-
-    SHAPE_NONE = " "
-    SHAPE_STRAIGHT = "|"
-    SHAPE_T = "T"
-    SHAPE_L_LEFT = "<"
-    SHAPE_L_RIGHT = ">"
-    SHAPE_Y = "Y"
+    SHAPE_NONE = ' '
+    SHAPE_STRAIGHT = '|'
+    SHAPE_T = 'T'
+    SHAPE_L_LEFT = '<'
+    SHAPE_L_RIGHT = '>'
+    SHAPE_Y = 'Y'
+    CONFIG_MAJ_VERSION = 0
+    CONFIG_MIN_VERSION = 1
+    CONFIG_LOAD_CAL_STARTUP = 2
+    CONFIG_CAL_DURATION = 3
+    CONFIG_SHAPE_THRESHOLD_BLACK = 4
+    CONFIG_IR_POWER = 5
+    CONFIG_CRC = 6
 
     def _decode_index(self, raw, idx):
         if idx == self.VALUES:
-            return tuple(raw[: self.SENSOR_COUNT])
+            return tuple(raw[:self.SENSOR_COUNT])
         if idx == self.POSITION or idx == self.DERIVATIVE:
             return raw[idx] - 128
         if idx == self.SHAPE:
@@ -51,7 +53,6 @@ class BaseLineSensor:
             return raw
         if len(indices) == 1:
             return self._decode_index(raw, indices[0])
-
         out = []
         for idx in indices:
             decoded = self._decode_index(raw, idx)
@@ -60,6 +61,46 @@ class BaseLineSensor:
             else:
                 out.append(decoded)
         return tuple(out)
+
+    @staticmethod
+    def _bytes_tuple(value):
+        if value is None:
+            return ()
+        if isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        if isinstance(value, (bytes, bytearray)):
+            return tuple(value)
+        return (value,)
+
+    def _require_sensor_count(self, values, method_name):
+        if len(values) != self.SENSOR_COUNT:
+            raise ValueError(method_name + ' needs 8 values')
+
+    def set_calibration(self, minimum, maximum):
+        self.set_min(minimum)
+        return self.set_max(maximum)
+
+    def get_config(self):
+        raw = self.show_config()
+        names = ('maj_version', 'min_version', 'load_cal_startup', 'cal_duration', 'shape_threshold_black', 'ir_power', 'crc')
+        result = {}
+        for (index, name) in enumerate(names):
+            result[name] = raw[index] if index < len(raw) else None
+        return result
+
+    def set_load_cal_startup(self, calibrated=True):
+        return self.set_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
+
+    def set_cal_duration(self, seconds):
+        return self.set_value(self.CONFIG_CAL_DURATION, seconds)
+
+    def set_shape_threshold_black(self, threshold):
+        return self.set_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
+
+    def set_ir_emitter_startup(self, emitter=True):
+        return self.set_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
 
     def sensors(self):
         return self.data(self.VALUES)
@@ -78,6 +119,12 @@ class BaseLineSensor:
 
     def position_derivative_shape(self):
         return self.data(self.POSITION, self.DERIVATIVE, self.SHAPE)
+
+    def mode_calibrated(self):
+        return self.mode(self.MODE_CALIBRATED)
+
+    def mode_raw(self):
+        return self.mode(self.MODE_RAW)
 
 """Minimal Pybricks-only uRemote client for standalone bundling."""
 
@@ -259,52 +306,83 @@ class uRemote:
             raise uRemoteError("unexpected reply: " + reply_cmd)
         return _unwrap_result(payload)
 
-"""LineSensorUR for the standalone Pybricks bundle."""
-
-from pybricks.tools import wait
-
+"""uRemote transport for the LMS line sensor."""
 
 class LineSensorUR(BaseLineSensor):
-    def __init__(self, port, settle_ms=1, remote_class=None):
-        self.ur = (remote_class or uRemote)(port)
+    """LMS Line Sensor using the Pybricks uRemote transport on UART."""
+
+    def __init__(self, port=None, settle_ms=1):
+        self.ur = uRemote(port) if port else uRemote()
         self.settle_ms = settle_ms
+        config = self.show_config()
+        self.version = (config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
+        self.cal_duration = config[self.CONFIG_CAL_DURATION]
+
+    def mode(self, mode=None):
+        if mode is None:
+            return self.ur.call('mode')
+        return self.ur.call('mode', mode)
+
+    def read_all(self):
+        if self.settle_ms:
+            wait(self.settle_ms)
+        return self._bytes_tuple(self.ur.call('all'))
 
     def data(self, *indices):
         raw = self.read_all()
         return self._select_indices(raw, indices)
 
-    def read_all(self):
-        if self.settle_ms:
-            wait(self.settle_ms)
-        return tuple(self.ur.call("all"))
+    def start_calibration(self, save=False):
+        return self.ur.call('calibrate', 1 if save else 0)
 
-    def mode_raw(self):
-        return self.ur.call("mode", self.MODE_RAW)
-
-    def mode_calibrated(self):
-        return self.ur.call("mode", self.MODE_CALIBRATED)
-
-    def leds(self, mode):
-        return self.ur.call("led", mode)
-
-    def start_calibration(self):
+    def calibrate(self, duration=None, save=True):
         self.leds(self.LEDS_OFF)
-        return self.ur.call("calibrate")
-
-    def calibrate(self, duration=5):
-        self.start_calibration()
+        self.start_calibration(save=save)
+        if duration is None:
+            duration = self.cal_duration
         wait(1000 * (duration + 1))
-        wait(1500)
-        return self.save_calibration()
+        return self.is_calibrated()
+
+    def is_calibrated(self):
+        return bool(self.ur.call('is_calibrated') or 0)
 
     def save_calibration(self):
-        return self.ur.call("save")
+        return self.ur.call('save_cal')
 
     def load_calibration(self):
-        return self.ur.call("load")
+        return self.ur.call('load_cal')
 
-    def ir_power(self, power):
-        return self.ur.call("emitter", power)
+    def get_min(self):
+        return self._bytes_tuple(self.ur.call('get_min'))
+
+    def get_max(self):
+        return self._bytes_tuple(self.ur.call('get_max'))
+
+    def set_min(self, values):
+        self._require_sensor_count(values, 'set_min')
+        return self.ur.call('set_min', *values)
+
+    def set_max(self, values):
+        self._require_sensor_count(values, 'set_max')
+        return self.ur.call('set_max', *values)
+
+    def show_config(self):
+        return self._bytes_tuple(self.ur.call('show_config'))
+
+    def load_config(self):
+        return self.ur.call('load_config')
+
+    def save_config(self):
+        return self.ur.call('save_config')
+
+    def leds(self, mode):
+        return self.ur.call('leds', mode)
 
     def neopixel(self, led_nr, r, g, b):
-        return self.ur.call("neopixel", led_nr, r, g, b)
+        return self.ur.call('neopixel', led_nr, r, g, b)
+
+    def ir_power(self, power):
+        return self.ur.call('set_emitter', 1 if power else 0)
+
+    def get_uid(self):
+        return self._bytes_tuple(self.ur.call('get_uid'))

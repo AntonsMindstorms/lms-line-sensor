@@ -7,6 +7,12 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+TOOLS_DIR = REPO_ROOT / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from pybricks_bundle_ast import bundle_ur_methods, pybricks_omit_methods
+
 MICROPYTHON_DIR = REPO_ROOT / "micropython"
 if str(MICROPYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(MICROPYTHON_DIR))
@@ -36,8 +42,125 @@ sys.modules["pybricks.tools"] = pybricks_tools
 sys.modules["pybricks.iodevices"] = pybricks_iodevices
 sys.modules["pybricks.parameters"] = pybricks_parameters
 
+
+class MockURemoteError(Exception):
+    pass
+
+
+class MockURemote:
+    def __init__(self, port=None):
+        self.port = port
+        self.calls = []
+        self._all_data = [10, 20, 30, 40, 50, 60, 70, 80, 128, 0, 200, 128, 124]
+
+    def call(self, cmd, *args):
+        self.calls.append((cmd, args))
+        if cmd == "all":
+            return list(self._all_data)
+        if cmd == "data":
+            return list(self._all_data[:8])
+        if cmd == "get_version":
+            return [1, 2]
+        if cmd == "pds":
+            return [128, 100, ord("T")]
+        if cmd == "pdr":
+            return [128, 100, ord("T")]
+        if cmd == "get_min":
+            return [0] * 8
+        if cmd == "get_max":
+            return [255] * 8
+        if cmd == "show_config":
+            return [3, 85, 1, 5, 128, 1, 0]
+        if cmd == "get_uid":
+            return list(range(12))
+        if cmd == "get_value":
+            return [args[0]]
+        if cmd == "is_calibrated":
+            return [1]
+        return args[0] if cmd in {"mode", "cur_mode", "debug", "leds"} else 0
+
+
+uremote_module = types.ModuleType("uremote")
+uremote_module.uRemote = MockURemote
+uremote_module.uRemoteError = MockURemoteError
+sys.modules["uremote"] = uremote_module
+
 import line_sensor
 import line_sensor_pybricks
+
+
+BASE_CLASS_METHODS = [
+    "sensors",
+    "position",
+    "derivative",
+    "position_derivative",
+    "shape",
+    "position_derivative_shape",
+    "get_config",
+    "uid_hex",
+    "set_calibration",
+    "set_load_cal_startup",
+    "set_cal_duration",
+    "set_shape_threshold_black",
+    "set_ir_emitter_startup",
+    "mode_raw",
+    "mode_calibrated",
+]
+
+SHARED_API_METHODS = [
+    "mode_raw",
+    "mode_calibrated",
+    "sensors",
+    "position",
+    "position_derivative",
+    "shape",
+    "data",
+    "calibrate",
+    "load_calibration",
+    "save_calibration",
+    "ir_power",
+    "leds",
+]
+
+LINE_SENSOR_UR_EXTRA_METHODS = [
+    "ping",
+    "add",
+    "echo",
+    "debug",
+    "version",
+    "read_all",
+    "read_sensors",
+    "start_calibration",
+    "is_calibrated",
+    "get_min",
+    "get_max",
+    "set_min",
+    "set_max",
+    "get_value",
+    "set_value",
+    "show_config",
+    "get_config",
+    "get_uid",
+    "uid_hex",
+    "neopixel",
+    "pds_raw",
+    "pdr_raw",
+    "position_byte",
+    "shape_byte",
+    "current_mode",
+    "blackline",
+    "mode",
+    "set_load_cal_startup",
+    "set_cal_duration",
+    "set_shape_threshold_black",
+    "set_ir_emitter_startup",
+]
+
+LINE_SENSOR_UR_METHODS = SHARED_API_METHODS + LINE_SENSOR_UR_EXTRA_METHODS
+
+UR_SOURCE = (REPO_ROOT / "micropython" / "line_sensor" / "ur.py").read_text(encoding="utf-8")
+LINE_SENSOR_UR_BUNDLE_METHODS = bundle_ur_methods(UR_SOURCE)
+LINE_SENSOR_UR_OMIT_METHODS = pybricks_omit_methods(UR_SOURCE)
 
 
 class TestBaseLineSensorConstants:
@@ -299,6 +422,94 @@ class TestLineSensorI2CDataProcessing:
         assert result == expected, f"Expected {expected}, got {result}"
 
 
+class TestLineSensorURDataProcessing:
+    """Test uRemote-specific data processing and RPC wiring."""
+
+    def setup_method(self):
+        self.sensor = line_sensor.LineSensorUR(
+            port="B", settle_ms=0, remote_class=MockURemote
+        )
+
+    def test_position_returns_scalar(self):
+        result = self.sensor.position()
+        assert isinstance(result, int)
+        assert result == 0
+
+    def test_shape_returns_character(self):
+        result = self.sensor.shape()
+        assert isinstance(result, str)
+        assert result == "|"
+
+    def test_sensors_returns_tuple_of_8(self):
+        result = self.sensor.sensors()
+        assert isinstance(result, tuple)
+        assert len(result) == 8
+        assert result == (10, 20, 30, 40, 50, 60, 70, 80)
+
+    def test_data_with_indices_applies_offset_and_chr(self):
+        self.sensor.ur._all_data = [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            128,
+            9,
+            200,
+            100,
+            84,
+        ]
+        result = self.sensor.data(self.sensor.POSITION, self.sensor.SHAPE)
+        assert result == (0, "T")
+
+    def test_position_derivative_shape_uses_all(self):
+        self.sensor.ur._all_data = [
+            10, 20, 30, 40, 50, 60, 70, 80, 128, 9, 200, 100, ord("T"),
+        ]
+        result = self.sensor.position_derivative_shape()
+        assert result == (0, -28, "T")
+        assert ("all", ()) in self.sensor.ur.calls
+
+    def test_mode_raw_calls_firmware_command(self):
+        self.sensor.mode_raw()
+        assert ("set_mode_raw", ()) in self.sensor.ur.calls
+
+    def test_set_min_requires_eight_values(self):
+        try:
+            self.sensor.set_min([1, 2, 3])
+            assert False, "Expected ValueError"
+        except ValueError as exc:
+            assert str(exc) == "set_min needs 8 values"
+
+    def test_config_returns_named_fields(self):
+        result = self.sensor.get_config()
+        assert result["maj_version"] == 3
+        assert result["min_version"] == 85
+        assert result["cal_duration"] == 5
+
+    def test_uid_hex_formats_bytes(self):
+        assert self.sensor.uid_hex() == "000102030405060708090a0b"
+
+    def test_calibrate_matches_updated_flow(self):
+        self.sensor.cal_duration = 5
+        with patch.object(line_sensor.LineSensorUR, "leds"), patch.object(
+            line_sensor.LineSensorUR, "start_calibration"
+        ) as start_calibration, patch(
+            "line_sensor.ur.wait"
+        ) as wait_mock, patch.object(
+            line_sensor.LineSensorUR, "is_calibrated", return_value=True
+        ) as is_calibrated:
+            result = self.sensor.calibrate()
+
+        start_calibration.assert_called_once_with(save=True)
+        wait_mock.assert_called_once_with(6000)
+        is_calibrated.assert_called_once_with()
+        assert result is True
+
+
 class TestPackageLayout:
     """Verify the split package and standalone Pybricks file expose expected symbols."""
 
@@ -312,51 +523,67 @@ class TestPackageLayout:
         assert hasattr(line_sensor_pybricks, "uRemote")
         assert hasattr(line_sensor_pybricks, "uRemoteError")
 
+    def test_pybricks_omit_tags_match_expected(self):
+        assert set(LINE_SENSOR_UR_OMIT_METHODS) == {
+            "ping",
+            "add",
+            "echo",
+            "debug",
+            "version",
+            "current_mode",
+            "mode_raw",
+            "mode_calibrated",
+            "read_sensors",
+            "position_byte",
+            "shape_byte",
+            "pds_raw",
+            "pdr_raw",
+            "blackline",
+            "get_value",
+            "set_value",
+        }
+
+    def test_pybricks_bundle_exposes_trimmed_ur_api(self):
+        for method_name in LINE_SENSOR_UR_BUNDLE_METHODS:
+            assert method_name in line_sensor_pybricks.LineSensorUR.__dict__, (
+                f"line_sensor_pybricks.LineSensorUR missing method: {method_name}"
+            )
+        for method_name in LINE_SENSOR_UR_OMIT_METHODS:
+            assert method_name not in line_sensor_pybricks.LineSensorUR.__dict__, (
+                f"line_sensor_pybricks.LineSensorUR should omit: {method_name}"
+            )
+
 
 class TestSharedAPISignatures:
     """Test that all required methods exist on base class and are callable."""
 
     def test_base_class_has_required_methods(self):
-        """Verify BaseLineSensor defines all required abstract methods."""
-        required_methods = [
-            "mode_raw",
-            "mode_calibrated",
-            "sensors",
-            "position",
-            "position_derivative",
-            "shape",
-            "data",
-            "calibrate",
-            "load_calibration",
-            "save_calibration",
-            "ir_power",
-            "leds",
-        ]
-        for method_name in required_methods:
+        """Verify BaseLineSensor defines shared high-level methods."""
+        for method_name in BASE_CLASS_METHODS:
             assert hasattr(
                 line_sensor.BaseLineSensor, method_name
             ), f"BaseLineSensor missing method: {method_name}"
 
     def test_i2c_implements_all_base_methods(self):
         """Verify LineSensorI2C implements all base class methods."""
-        required_methods = [
-            "mode_raw",
-            "mode_calibrated",
-            "sensors",
-            "position",
-            "position_derivative",
-            "shape",
-            "data",
-            "calibrate",
-            "load_calibration",
-            "save_calibration",
-            "ir_power",
-            "leds",
-        ]
-        for method_name in required_methods:
+        for method_name in SHARED_API_METHODS:
             assert hasattr(
                 line_sensor.LineSensorI2C, method_name
             ), f"LineSensorI2C missing method: {method_name}"
+
+    def test_ur_implements_all_base_methods(self):
+        """Verify LineSensorUR implements all base class methods."""
+        for method_name in SHARED_API_METHODS:
+            assert hasattr(
+                line_sensor.LineSensorUR, method_name
+            ), f"LineSensorUR missing method: {method_name}"
+
+    def test_ur_exposes_extended_firmware_api(self):
+        """Verify LineSensorUR exposes the full uRemote firmware surface."""
+        for method_name in LINE_SENSOR_UR_METHODS:
+            assert hasattr(
+                line_sensor.LineSensorUR, method_name
+            ), f"LineSensorUR missing method: {method_name}"
 
 
 if __name__ == "__main__":
@@ -366,6 +593,7 @@ if __name__ == "__main__":
     test_classes = [
         TestBaseLineSensorConstants,
         TestLineSensorI2CDataProcessing,
+        TestLineSensorURDataProcessing,
         TestPackageLayout,
         TestSharedAPISignatures,
     ]
