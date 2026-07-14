@@ -158,9 +158,9 @@ LINE_SENSOR_UR_EXTRA_METHODS = [
 
 LINE_SENSOR_UR_METHODS = SHARED_API_METHODS + LINE_SENSOR_UR_EXTRA_METHODS
 
-UR_SOURCE = (REPO_ROOT / "micropython" / "line_sensor" / "ur.py").read_text(encoding="utf-8")
+UR_SOURCE = (REPO_ROOT / "micropython" / "line_sensor.py").read_text(encoding="utf-8")
 LINE_SENSOR_UR_BUNDLE_METHODS = bundle_ur_methods(UR_SOURCE)
-LINE_SENSOR_UR_OMIT_METHODS = pybricks_omit_methods(UR_SOURCE)
+LINE_SENSOR_UR_OMIT_METHODS = pybricks_omit_methods(UR_SOURCE, "LineSensorUR")
 
 
 class TestBaseLineSensorConstants:
@@ -498,7 +498,7 @@ class TestLineSensorURDataProcessing:
         with patch.object(line_sensor.LineSensorUR, "leds"), patch.object(
             line_sensor.LineSensorUR, "start_calibration"
         ) as start_calibration, patch(
-            "line_sensor.ur.wait"
+            "line_sensor.wait"
         ) as wait_mock, patch.object(
             line_sensor.LineSensorUR, "is_calibrated", return_value=True
         ) as is_calibrated:
@@ -511,9 +511,9 @@ class TestLineSensorURDataProcessing:
 
 
 class TestPackageLayout:
-    """Verify the split package and standalone Pybricks file expose expected symbols."""
+    """Verify the standalone modules expose expected symbols."""
 
-    def test_package_exports_main_classes(self):
+    def test_line_sensor_exports_main_classes(self):
         assert hasattr(line_sensor, "BaseLineSensor")
         assert hasattr(line_sensor, "LineSensorI2C")
         assert hasattr(line_sensor, "LineSensorUR")

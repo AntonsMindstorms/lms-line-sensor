@@ -118,11 +118,13 @@ def transform_module(source, *, omit_tagged_methods=False, slim_base=False, stri
     return ast.unparse(tree)
 
 
-def pybricks_omit_methods(source):
+def pybricks_omit_methods(source, class_name=None):
     omitted = []
     tree = ast.parse(source)
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
+            if class_name and node.name != class_name:
+                continue
             for item in node.body:
                 if isinstance(item, ast.FunctionDef) and is_pybricks_omit(item):
                     omitted.append(item.name)
@@ -139,6 +141,20 @@ def bundle_ur_methods(source):
                     if not is_pybricks_omit(item):
                         methods.append(item.name)
     return methods
+
+
+def extract_class_module(source, class_name):
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            return ast.unparse(node)
+    raise ValueError(f"{class_name} not found in source")
+
+
+def extract_ur_module(source):
+    marker = '"""uRemote transport for the LMS line sensor."""'
+    idx = source.index(marker)
+    return source[idx:].strip()
 
 
 def adapt_ur_for_bundle(source):
@@ -165,7 +181,7 @@ def adapt_ur_for_bundle(source):
         self.ur = uRemote(port) if port else uRemote()
         self.settle_ms = settle_ms
         config = self.show_config()
-        self.version = (config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
+        self.version = '{}.{}'.format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
         self.cal_duration = config[self.CONFIG_CAL_DURATION]
 
 """

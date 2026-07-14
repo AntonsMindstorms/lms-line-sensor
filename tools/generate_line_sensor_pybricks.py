@@ -2,11 +2,16 @@
 
 from pathlib import Path
 
-from pybricks_bundle_ast import adapt_ur_for_bundle, transform_module
+from pybricks_bundle_ast import (
+    adapt_ur_for_bundle,
+    extract_class_module,
+    extract_ur_module,
+    transform_module,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LINE_SENSOR_DIR = REPO_ROOT / "micropython" / "line_sensor"
+LINE_SENSOR_FILE = REPO_ROOT / "micropython" / "line_sensor.py"
 VENDOR_DIR = REPO_ROOT / "micropython" / "vendor"
 OUTPUT_FILE = REPO_ROOT / "micropython" / "line_sensor_pybricks.py"
 
@@ -16,8 +21,12 @@ def _read(path):
 
 
 def main():
-    base_src = _read(LINE_SENSOR_DIR / "base.py")
-    ur_src = _read(LINE_SENSOR_DIR / "ur.py")
+    line_sensor_src = _read(LINE_SENSOR_FILE)
+    base_src = (
+        '"""Shared API and constants for LMS line sensor drivers."""\n\n\n'
+        + extract_class_module(line_sensor_src, "BaseLineSensor")
+    )
+    ur_src = extract_ur_module(line_sensor_src)
 
     parts = [
         '"""Generated standalone Pybricks driver for the LMS line sensor.\n\n'

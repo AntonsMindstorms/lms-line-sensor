@@ -7,7 +7,6 @@ Do not edit by hand. Regenerate with:
 __all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']
 
 """Shared API and constants for LMS line sensor drivers."""
-__version__ = '0.3.0'
 
 class BaseLineSensor:
     """Base class for LMS Line Sensor implementations."""
@@ -315,7 +314,7 @@ class LineSensorUR(BaseLineSensor):
         self.ur = uRemote(port) if port else uRemote()
         self.settle_ms = settle_ms
         config = self.show_config()
-        self.version = (config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
+        self.version = '{}.{}'.format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
         self.cal_duration = config[self.CONFIG_CAL_DURATION]
 
     def mode(self, mode=None):

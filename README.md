@@ -134,13 +134,13 @@ sphinx-build -b html docs docs/_build/html
 
 ## Development Notes
 
-- Main package source: `micropython/line_sensor/`
-- Pybricks bundle is generated from `micropython/line_sensor/` via `tools/generate_line_sensor_pybricks.py`
+- Main MicroPython source: `micropython/line_sensor.py`
+- Pybricks bundle is generated from `micropython/line_sensor.py` via `tools/generate_line_sensor_pybricks.py`
 - Generated Pybricks standalone module: `micropython/line_sensor_pybricks.py`
 - API docs entry point: `docs/index.rst`
 - The Sphinx configuration mocks the MicroPython `machine` module so docs can be built on desktop Python.
 - Submit update to PyPI:
-  - Update version in [base.py](micropython/line_sensor/base.py)
+  - Update version in [line_sensor.py](micropython/line_sensor.py)
   - Update version in [package.json](package.json)
   - Activate venv
   - `rm -rf ./dist && python -m build && twine upload dist/*`
