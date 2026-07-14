@@ -1,24 +1,31 @@
 """uRemote transport for the LMS line sensor."""
 
 from .base import BaseLineSensor
-from vendor.uremote import uRemote, uRemoteError
 
 try:
     from pybricks.tools import wait
 except ImportError:
-    wait = None
-
+    from time import sleep
+    def wait(ms):
+        sleep(ms / 1000)
 
 class LineSensorUR(BaseLineSensor):
-    """LMS Line Sensor over uRemote (Pybricks UART)."""
+    """Connect to the sensor over uRemote.
+
+    Args:
+        port (str or Port): port for the uRemote connection. E.g. "A", Port.A, or None.
+        settle_ms (int): Milliseconds to wait after sending a command.
+        remote_class (class): uRemote client class. Defaults to uRemote.
+            Pass a stub class for testing.
+    """
 
     def __init__(self, port, settle_ms=1, remote_class=None):
-        if wait is None:
-            raise RuntimeError(
-                "LineSensorUR requires Pybricks. Use LineSensorI2C for direct "
-                "I2C access on MicroPython."
-            )
-        self.ur = (remote_class or uRemote)(port)
+        from uremote import uRemote, uRemoteError
+        self.ur_error = uRemoteError
+        if port:
+            self.ur = (remote_class or uRemote)(port)
+        else:
+            self.ur = uRemote()
         self.settle_ms = settle_ms
 
     def _call(self, command, *args):
@@ -29,13 +36,13 @@ class LineSensorUR(BaseLineSensor):
         for command, args in variants:
             try:
                 return self._call(command, *args)
-            except uRemoteError as exc:
+            except self.ur_error as exc:
                 last_error = exc
         if default is not None:
             return default
         if last_error is not None:
             raise last_error
-        raise uRemoteError("No compatible remote command found")
+        raise self.ur_error("No compatible remote command found")
 
     def ping(self):
         return self._call("ping")
@@ -115,7 +122,7 @@ class LineSensorUR(BaseLineSensor):
         if save:
             try:
                 self.save_calibration()
-            except uRemoteError:
+            except self.ur_error:
                 pass
         return self.is_calibrated()
 
