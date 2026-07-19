@@ -14,9 +14,11 @@ This document describes the I2C protocol implemented by the LMS line-sensor firm
 
 The line sensor is an I2C slave. The ESP32 is the I2C controller.
 
+- Connect the line sensor board to the LMS-ESp32v2 using a straight QWIIC 4 pin cable
+
+When conecting to another i2C contoller:
 -  Use a common ground between the ESP32 and the line sensor.
 -  Use the logic voltage required by the sensor board. ESP32 GPIO is 3.3 V only.
--  SDA and SCL require pull-up resistors if the boards do not already provide them.
 -  The firmware uses 7-bit I2C address ``0x33`` unless compiled with ``TEST_VERSION``, in which case it uses ``0x34``.
 
 Example ESP32 initialization:
