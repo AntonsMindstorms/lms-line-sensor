@@ -3,6 +3,8 @@ LMS Line Sensor I2C API
 
 | Firmware reference: **3.87**
 | Default I2C slave address: **``0x33``**
+| Two QWIIC I2C ports
+| Serial debug port (115200) at TX pin of 2x3 Header.
 | Sensor channels: **8**
 
 This document describes the I2C protocol implemented by the LMS line-sensor firmware and gives MicroPython examples for an ESP32 acting as the I2C controller.
