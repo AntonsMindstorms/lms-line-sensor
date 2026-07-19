@@ -79,8 +79,19 @@ Quick example program:
 
 API Reference
 -------------
+Python module reference
+***********************
 
 .. automodule:: line_sensor
    :members:
    :undoc-members:
    :show-inheritance:
+
+Line sensor hardware register and native commands
+*************************************************
+
+.. toctree::
+   :maxdepth: 2
+
+   API/lms-line-sensor-i2c-api
+   API/lms-line-sensor-uremote-api
