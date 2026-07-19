@@ -196,153 +196,153 @@ Byte    Character Meaning
 
 All command IDs and arguments are unsigned bytes.
 
-+----+-----------------+-----------------+----------+-----------------+
-| ID | Name            | Request after   | Response | Description     |
-|    |                 | command byte    |          |                 |
-+====+=================+=================+==========+=================+
-| 0  | ``SET_MODE_RAW``| None            | None     | Select raw      |
-|    |                 |                 |          | measurement     |
-|    |                 |                 |          | mode.           |
-+----+-----------------+-----------------+----------+-----------------+
-| 1  | ``SET_MODE_CAL``| None            | None     | Select          |
-|    |                 |                 |          | calibr          |
-|    |                 |                 |          | ated/normalized |
-|    |                 |                 |          | measurement     |
-|    |                 |                 |          | mode.           |
-+----+-----------------+-----------------+----------+-----------------+
-| 2  | ``GET_VERSION`` | None            | 13 bytes | Bytes 0 and 1   |
-|    |                 |                 |          | contain major   |
-|    |                 |                 |          | and minor       |
-|    |                 |                 |          | firmware        |
-|    |                 |                 |          | versions.       |
-|    |                 |                 |          | Remaining bytes |
-|    |                 |                 |          | are zero.       |
-+----+-----------------+-----------------+----------+-----------------+
-| 3  | ``DEBUG``       | ``level``       | None     | Set serial log  |
-|    |                 |                 |          | level:          |
-|    |                 |                 |          | ``0..4``.       |
-+----+-----------------+-----------------+----------+-----------------+
-| 4  | ``CALIBRATE``   | Optional        | None     | Start           |
-|    |                 | ``save``        |          | calibration.    |
-|    |                 |                 |          | Nonzero         |
-|    |                 |                 |          | ``save`` stores |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | after           |
-|    |                 |                 |          | completion.     |
-+----+-----------------+-----------------+----------+-----------------+
-| 5  |                 | None            | 13 bytes | Byte 0 is ``1`` |
++----+-------------------+-----------------+----------+-----------------+
+| ID | Name              | Request after   | Response | Description     |
+|    |                   | command byte    |          |                 |
++====+===================+=================+==========+=================+
+| 0  | ``SET_MODE_RAW``  | None            | None     | Select raw      |
+|    |                   |                 |          | measurement     |
+|    |                   |                 |          | mode.           |
++----+-------------------+-----------------+----------+-----------------+
+| 1  | ``SET_MODE_CAL``  | None            | None     | Select          |
+|    |                   |                 |          | calibr          |
+|    |                   |                 |          | ated/normalized |
+|    |                   |                 |          | measurement     |
+|    |                   |                 |          | mode.           |
++----+-------------------+-----------------+----------+-----------------+
+| 2  | ``GET_VERSION``   | None            | 13 bytes | Bytes 0 and 1   |
+|    |                   |                 |          | contain major   |
+|    |                   |                 |          | and minor       |
+|    |                   |                 |          | firmware        |
+|    |                   |                 |          | versions.       |
+|    |                   |                 |          | Remaining bytes |
+|    |                   |                 |          | are zero.       |
++----+-------------------+-----------------+----------+-----------------+
+| 3  | ``DEBUG``         | ``level``       | None     | Set serial log  |
+|    |                   |                 |          | level:          |
+|    |                   |                 |          | ``0..4``.       |
++----+-------------------+-----------------+----------+-----------------+
+| 4  | ``CALIBRATE``     | Optional        | None     | Start           |
+|    |                   | ``save``        |          | calibration.    |
+|    |                   |                 |          | Nonzero         |
+|    |                   |                 |          | ``save`` stores |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | after           |
+|    |                   |                 |          | completion.     |
++----+-------------------+-----------------+----------+-----------------+
+| 5  |                   | None            | 13 bytes | Byte 0 is ``1`` |
 |    | ``IS_CALIBRATED`` |                 |          | when            |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | data is         |
-|    |                 |                 |          | present,        |
-|    |                 |                 |          | otherwise       |
-|    |                 |                 |          | ``0``.          |
-+----+-----------------+-----------------+----------+-----------------+
-| 6  | ``LOAD_CAL``    | None            | None     | Load            |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | minimum and     |
-|    |                 |                 |          | maximum values  |
-|    |                 |                 |          | from EEPROM.    |
-|    |                 |                 |          | Deferred to the |
-|    |                 |                 |          | main loop.      |
-+----+-----------------+-----------------+----------+-----------------+
-| 7  | ``SAVE_CAL``    | None            | None     | Save current    |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | values to       |
-|    |                 |                 |          | EEPROM.         |
-|    |                 |                 |          | Deferred to the |
-|    |                 |                 |          | main loop.      |
-+----+-----------------+-----------------+----------+-----------------+
-| 8  | ``GET_MIN``     | None            | 13 bytes | Bytes 0..7      |
-|    |                 |                 |          | contain         |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | minima.         |
-+----+-----------------+-----------------+----------+-----------------+
-| 9  | ``GET_MAX``     | None            | 13 bytes | Bytes 0..7      |
-|    |                 |                 |          | contain         |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | maxima.         |
-+----+-----------------+-----------------+----------+-----------------+
-| 10 | ``SET_MIN``     | Eight values    | None     | Set the eight   |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | minima.         |
-+----+-----------------+-----------------+----------+-----------------+
-| 11 | ``SET_MAX``     | Eight values    | None     | Set the eight   |
-|    |                 |                 |          | calibration     |
-|    |                 |                 |          | maxima.         |
-+----+-----------------+-----------------+----------+-----------------+
-| 12 | ``NEOPIXEL``    | ``index, red    | None     | Set one         |
-|    |                 | , green, blue`` |          | NeoPixel        |
-|    |                 |                 |          | immediately.    |
-+----+-----------------+-----------------+----------+-----------------+
-| 13 | ``LEDS``        | ``mode``        | None     | Select          |
-|    |                 |                 |          | automatic LED   |
-|    |                 |                 |          | display mode.   |
-+----+-----------------+-----------------+----------+-----------------+
-| 14 | ``SET_EMITTER`` | ``level``       | None     | Set the         |
-|    |                 |                 |          | optional IR     |
-|    |                 |                 |          | emitter control |
-|    |                 |                 |          | output low or   |
-|    |                 |                 |          | high.           |
-+----+-----------------+-----------------+----------+-----------------+
-| 15 | ``GET_VALUE``   | ``index``       | 13 bytes | Byte 0 contains |
-|    |                 |                 |          | one             |
-|    |                 |                 |          | configuration   |
-|    |                 |                 |          | byte.           |
-+----+-----------------+-----------------+----------+-----------------+
-| 16 | ``SET_VALUE``   | `               | None     | Set one         |
-|    |                 | `index, value`` |          | configuration   |
-|    |                 |                 |          | byte and        |
-|    |                 |                 |          | schedule the    |
-|    |                 |                 |          | configuration   |
-|    |                 |                 |          | for saving.     |
-+----+-----------------+-----------------+----------+-----------------+
-| 17 | ``SHOW_CONFIG`` | None            | None     | Print           |
-|    |                 |                 |          | configuration   |
-|    |                 |                 |          | to the sensor's |
-|    |                 |                 |          | serial console  |
-|    |                 |                 |          | only.           |
-+----+-----------------+-----------------+----------+-----------------+
-| 18 | ``LOAD_CONFIG`` | None            | None     | Load            |
-|    |                 |                 |          | configuration   |
-|    |                 |                 |          | from EEPROM, or |
-|    |                 |                 |          | use defaults if |
-|    |                 |                 |          | invalid.        |
-+----+-----------------+-----------------+----------+-----------------+
-| 19 | ``SAVE_CONFIG`` | None            | None     | Save            |
-|    |                 |                 |          | configuration   |
-|    |                 |                 |          | to EEPROM.      |
-|    |                 |                 |          | Deferred to the |
-|    |                 |                 |          | main loop.      |
-+----+-----------------+-----------------+----------+-----------------+
-| 20 | ``GPIO_OUT``    | ``logic         | None     | Configure a     |
-|    |                 | al_pin, value`` |          | test GPIO as    |
-|    |                 |                 |          | output and      |
-|    |                 |                 |          | write it.       |
-+----+-----------------+-----------------+----------+-----------------+
-| 21 | ``GPIO_IN``     | ``logical_pin`` | 1 byte   | Read a test     |
-|    |                 |                 |          | GPIO. Returns   |
-|    |                 |                 |          | ``0``, ``1``,   |
-|    |                 |                 |          | or ``0xFF`` for |
-|    |                 |                 |          | an invalid pin. |
-+----+-----------------+-----------------+----------+-----------------+
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | data is         |
+|    |                   |                 |          | present,        |
+|    |                   |                 |          | otherwise       |
+|    |                   |                 |          | ``0``.          |
++----+-------------------+-----------------+----------+-----------------+
+| 6  | ``LOAD_CAL``      | None            | None     | Load            |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | minimum and     |
+|    |                   |                 |          | maximum values  |
+|    |                   |                 |          | from EEPROM.    |
+|    |                   |                 |          | Deferred to the |
+|    |                   |                 |          | main loop.      |
++----+-------------------+-----------------+----------+-----------------+
+| 7  | ``SAVE_CAL``      | None            | None     | Save current    |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | values to       |
+|    |                   |                 |          | EEPROM.         |
+|    |                   |                 |          | Deferred to the |
+|    |                   |                 |          | main loop.      |
++----+-------------------+-----------------+----------+-----------------+
+| 8  | ``GET_MIN``       | None            | 13 bytes | Bytes 0..7      |
+|    |                   |                 |          | contain         |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | minima.         |
++----+-------------------+-----------------+----------+-----------------+
+| 9  | ``GET_MAX``       | None            | 13 bytes | Bytes 0..7      |
+|    |                   |                 |          | contain         |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | maxima.         |
++----+-------------------+-----------------+----------+-----------------+
+| 10 | ``SET_MIN``       | Eight values    | None     | Set the eight   |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | minima.         |
++----+-------------------+-----------------+----------+-----------------+
+| 11 | ``SET_MAX``       | Eight values    | None     | Set the eight   |
+|    |                   |                 |          | calibration     |
+|    |                   |                 |          | maxima.         |
++----+-------------------+-----------------+----------+-----------------+
+| 12 | ``NEOPIXEL``      | ``index, red    | None     | Set one         |
+|    |                   | , green, blue`` |          | NeoPixel        |
+|    |                   |                 |          | immediately.    |
++----+-------------------+-----------------+----------+-----------------+
+| 13 | ``LEDS``          | ``mode``        | None     | Select          |
+|    |                   |                 |          | automatic LED   |
+|    |                   |                 |          | display mode.   |
++----+-------------------+-----------------+----------+-----------------+
+| 14 | ``SET_EMITTER``   | ``level``       | None     | Set the         |
+|    |                   |                 |          | optional IR     |
+|    |                   |                 |          | emitter control |
+|    |                   |                 |          | output low or   |
+|    |                   |                 |          | high.           |
++----+-------------------+-----------------+----------+-----------------+
+| 15 | ``GET_VALUE``     | ``index``       | 13 bytes | Byte 0 contains |
+|    |                   |                 |          | one             |
+|    |                   |                 |          | configuration   |
+|    |                   |                 |          | byte.           |
++----+-------------------+-----------------+----------+-----------------+
+| 16 | ``SET_VALUE``     | `               | None     | Set one         |
+|    |                   | `index, value`` |          | configuration   |
+|    |                   |                 |          | byte and        |
+|    |                   |                 |          | schedule the    |
+|    |                   |                 |          | configuration   |
+|    |                   |                 |          | for saving.     |
++----+-------------------+-----------------+----------+-----------------+
+| 17 | ``SHOW_CONFIG``   | None            | None     | Print           |
+|    |                   |                 |          | configuration   |
+|    |                   |                 |          | to the sensor's |
+|    |                   |                 |          | serial console  |
+|    |                   |                 |          | only.           |
++----+-------------------+-----------------+----------+-----------------+
+| 18 | ``LOAD_CONFIG``   | None            | None     | Load            |
+|    |                   |                 |          | configuration   |
+|    |                   |                 |          | from EEPROM, or |
+|    |                   |                 |          | use defaults if |
+|    |                   |                 |          | invalid.        |
++----+-------------------+-----------------+----------+-----------------+
+| 19 | ``SAVE_CONFIG``   | None            | None     | Save            |
+|    |                   |                 |          | configuration   |
+|    |                   |                 |          | to EEPROM.      |
+|    |                   |                 |          | Deferred to the |
+|    |                   |                 |          | main loop.      |
++----+-------------------+-----------------+----------+-----------------+
+| 20 | ``GPIO_OUT``      | ``logic         | None     | Configure a     |
+|    |                   | al_pin, value`` |          | test GPIO as    |
+|    |                   |                 |          | output and      |
+|    |                   |                 |          | write it.       |
++----+-------------------+-----------------+----------+-----------------+
+| 21 | ``GPIO_IN``       | ``logical_pin`` | 1 byte   | Read a test     |
+|    |                   |                 |          | GPIO. Returns   |
+|    |                   |                 |          | ``0``, ``1``,   |
+|    |                   |                 |          | or ``0xFF`` for |
+|    |                   |                 |          | an invalid pin. |
++----+-------------------+-----------------+----------+-----------------+
 | 22 | ``SERIAL_DISABLE``| None            | 1 byte   | Disable serial  |
-|    |                 |                 |          | output.         |
-|    |                 |                 |          | Response is     |
-|    |                 |                 |          | ``1``.          |
-+----+-----------------+-----------------+----------+-----------------+
-| 23 | ``SERIAL_ENABLE``| None            | 1 byte   | Enable serial   |
-|    |                 |                 |          | output.         |
-|    |                 |                 |          | Response is     |
-|    |                 |                 |          | ``1``.          |
-+----+-----------------+-----------------+----------+-----------------+
-| 24 | ``GET_UID``     | None            | 12 bytes | Read the        |
-|    |                 |                 |          | CH32V203 96-bit |
-|    |                 |                 |          | unique ID in    |
-|    |                 |                 |          | little-endian   |
-|    |                 |                 |          | byte order per  |
-|    |                 |                 |          | 32-bit word.    |
-+----+-----------------+-----------------+----------+-----------------+
+|    |                   |                 |          | output.         |
+|    |                   |                 |          | Response is     |
+|    |                   |                 |          | ``1``.          |
++----+-------------------+-----------------+----------+-----------------+
+| 23 | ``SERIAL_ENABLE`` | None            | 1 byte   | Enable serial   |
+|    |                   |                 |          | output.         |
+|    |                   |                 |          | Response is     |
+|    |                   |                 |          | ``1``.          |
++----+-------------------+-----------------+----------+-----------------+
+| 24 | ``GET_UID``       | None            | 12 bytes | Read the        |
+|    |                   |                 |          | CH32V203 96-bit |
+|    |                   |                 |          | unique ID in    |
+|    |                   |                 |          | little-endian   |
+|    |                   |                 |          | byte order per  |
+|    |                   |                 |          | 32-bit word.    |
++----+-------------------+-----------------+----------+-----------------+
 
 .. _5-command-details:
 
