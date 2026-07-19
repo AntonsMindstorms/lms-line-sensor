@@ -200,12 +200,12 @@ All command IDs and arguments are unsigned bytes.
 | ID | Name            | Request after   | Response | Description     |
 |    |                 | command byte    |          |                 |
 +====+=================+=================+==========+=================+
-| 0  | `               | None            | None     | Select raw      |
-|    | `SET_MODE_RAW`` |                 |          | measurement     |
+| 0  | ``SET_MODE_RAW``| None            | None     | Select raw      |
+|    |                 |                 |          | measurement     |
 |    |                 |                 |          | mode.           |
 +----+-----------------+-----------------+----------+-----------------+
-| 1  | `               | None            | None     | Select          |
-|    | `SET_MODE_CAL`` |                 |          | calibr          |
+| 1  | ``SET_MODE_CAL``| None            | None     | Select          |
+|    |                 |                 |          | calibr          |
 |    |                 |                 |          | ated/normalized |
 |    |                 |                 |          | measurement     |
 |    |                 |                 |          | mode.           |
@@ -230,8 +230,8 @@ All command IDs and arguments are unsigned bytes.
 |    |                 |                 |          | after           |
 |    |                 |                 |          | completion.     |
 +----+-----------------+-----------------+----------+-----------------+
-| 5  | ``              | None            | 13 bytes | Byte 0 is ``1`` |
-|    | IS_CALIBRATED`` |                 |          | when            |
+| 5  |                 | None            | 13 bytes | Byte 0 is ``1`` |
+|    | ``IS_CALIBRATED`` |                 |          | when            |
 |    |                 |                 |          | calibration     |
 |    |                 |                 |          | data is         |
 |    |                 |                 |          | present,        |
@@ -326,13 +326,13 @@ All command IDs and arguments are unsigned bytes.
 |    |                 |                 |          | or ``0xFF`` for |
 |    |                 |                 |          | an invalid pin. |
 +----+-----------------+-----------------+----------+-----------------+
-| 22 | ``S             | None            | 1 byte   | Disable serial  |
-|    | ERIAL_DISABLE`` |                 |          | output.         |
+| 22 | ``SERIAL_DISABLE``| None            | 1 byte   | Disable serial  |
+|    |                 |                 |          | output.         |
 |    |                 |                 |          | Response is     |
 |    |                 |                 |          | ``1``.          |
 +----+-----------------+-----------------+----------+-----------------+
-| 23 | ``              | None            | 1 byte   | Enable serial   |
-|    | SERIAL_ENABLE`` |                 |          | output.         |
+| 23 | ``SERIAL_ENABLE``| None            | 1 byte   | Enable serial   |
+|    |                 |                 |          | output.         |
 |    |                 |                 |          | Response is     |
 |    |                 |                 |          | ``1``.          |
 +----+-----------------+-----------------+----------+-----------------+
