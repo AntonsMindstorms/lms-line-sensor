@@ -155,14 +155,14 @@ Frame fields
 |                  |            | byte, including the four-byte      |
 |                  |            | preamble                           |
 +------------------+------------+------------------------------------+
-| preamble         | 4 bytes    | Fixed byte sequence ``<$MU``       |
+| ``preamble``     | 4 bytes    | Fixed byte sequence ``<$MU``       |
 +------------------+------------+------------------------------------+
-| header           | 1 byte     | Upper 3 bits contain status; lower |
+| ``header``       | 1 byte     | Upper 3 bits contain status; lower |
 |                  |            | 5 bits contain command-name length |
 +------------------+------------+------------------------------------+
-| command          | 0–31 bytes | UTF-8 command name                 |
+| ``command``      | 0–31 bytes | UTF-8 command name                 |
 +------------------+------------+------------------------------------+
-| arguments        | variable   | Typed values                       |
+| ``arguments``    | variable   | Typed values                       |
 +------------------+------------+------------------------------------+
 
 The maximum complete frame length is 255 bytes. Command names are
@@ -350,14 +350,14 @@ Decode a shape response with:
 | ``version``    | none           | ``(m           | Firmware       |
 |                |                | ajor, minor)`` | version        |
 +----------------+----------------+----------------+----------------+
-| `              | none           | ``(m           | Alias of       |
-| `get_version`` |                | ajor, minor)`` | ``version``    |
+| ``get_version``| none           | ``(m           | Alias of       |
+|                |                | ajor, minor)`` | ``version``    |
 +----------------+----------------+----------------+----------------+
-| ``             | none           | mode ``0``     | Select raw     |
-| set_mode_raw`` |                |                | mode           |
+| ``set_mode_raw``  | none           | mode ``0``     | Select raw     |
+|                |                |                | mode           |
 +----------------+----------------+----------------+----------------+
-| ``             | none           | mode ``1``     | Select         |
-| set_mode_cal`` |                |                | calibrated     |
+| ``set_mode_cal`` | none           | mode ``1``     | Select         |
+|                |                |                | calibrated     |
 |                |                |                | mode           |
 +----------------+----------------+----------------+----------------+
 | ``mode``       | optional mode  | active mode    | Get or set     |
@@ -372,8 +372,8 @@ Decode a shape response with:
 | ``calibrate``  | optional save  | ``1``          | Start timed    |
 |                | flag           |                | calibration    |
 +----------------+----------------+----------------+----------------+
-| ``i            | none           | ``0`` or ``1`` | Cali           |
-| s_calibrated`` |                |                | bration-active |
+| ``is_calibrated`` | none           | ``0`` or ``1`` | Cali           |
+|                |                |                | bration-active |
 |                |                |                | flag           |
 +----------------+----------------+----------------+----------------+
 | ``save``       | none           | ``1``          | Save           |
@@ -434,23 +434,23 @@ Decode a shape response with:
 |                |                |                | configuration  |
 |                |                |                | byte           |
 +----------------+----------------+----------------+----------------+
-| `              | none           | configuration  | Return         |
-| `show_config`` |                | bytes          | complete       |
+| ``show_config``              | none           | configuration  | Return         |
+|                |                | bytes          | complete       |
 |                |                |                | configuration  |
 |                |                |                | structure      |
 +----------------+----------------+----------------+----------------+
-| `              | none           | ``1``          | Load           |
-| `load_config`` |                |                | configuration, |
+| ``load_config``| none           | ``1``          | Load           |
+|                 |               |                | configuration, |
 |                |                |                | or restore     |
 |                |                |                | defaults if    |
 |                |                |                | invalid        |
 +----------------+----------------+----------------+----------------+
-| `              | none           | ``1``          | Save           |
-| `save_config`` |                |                | configuration  |
+| ``save_config``| none           | ``1``          | Save           |
+|                |                | configuration  |
 |                |                |                | to EEPROM      |
 +----------------+----------------+----------------+----------------+
-| `              | bool or number | ``1``          | Set IR emitter |
-| `set_emitter`` |                |                | state          |
+| ``set_emitter`` | bool or number | ``1``          | Set IR emitter |
+|                  |                |                | state          |
 +----------------+----------------+----------------+----------------+
 | ``emitter``    | bool or number | ``1``          | Alias of       |
 |                |                |                | `              |
