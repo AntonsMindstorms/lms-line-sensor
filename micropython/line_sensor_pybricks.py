@@ -81,13 +81,16 @@ class BaseLineSensor:
         self.set_min(minimum)
         return self.set_max(maximum)
 
-    def get_config(self):
+    def get_config(self, as_text=True):
         raw = self.show_config()
-        names = ('maj_version', 'min_version', 'load_cal_startup', 'cal_duration', 'shape_threshold_black', 'ir_power', 'crc')
-        result = {}
-        for (index, name) in enumerate(names):
-            result[name] = raw[index] if index < len(raw) else None
-        return result
+        if as_text:
+            names = ('maj_version', 'min_version', 'load_cal_startup', 'cal_duration', 'shape_threshold_black', 'ir_power', 'crc')
+            result = {}
+            for index, name in enumerate(names):
+                result[name] = raw[index] if index < len(raw) else None
+            return result
+        else:
+            return raw
 
     def set_load_cal_startup(self, calibrated=True):
         return self.set_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)

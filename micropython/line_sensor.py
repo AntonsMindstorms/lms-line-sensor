@@ -14,7 +14,7 @@ Regenerate the Pybricks bundle after edits:
 
 __all__ = ['BaseLineSensor', 'LineSensorI2C', 'LineSensorUR', '__version__']
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 """Shared API and constants for LMS line sensor drivers."""
 
@@ -109,22 +109,25 @@ class BaseLineSensor:
         self.set_min(minimum)
         return self.set_max(maximum)
 
-    def get_config(self):
+    def get_config(self, as_text=True):
         """Return config as a dictionary."""
         raw = self.show_config()
-        names = (
-            "maj_version",
-            "min_version",
-            "load_cal_startup",
-            "cal_duration",
-            "shape_threshold_black",
-            "ir_power",
-            "crc",
-        )
-        result = {}
-        for index, name in enumerate(names):
-            result[name] = raw[index] if index < len(raw) else None
-        return result
+        if as_text:
+            names = (
+               "maj_version",
+               "min_version",
+               "load_cal_startup",
+               "cal_duration",
+               "shape_threshold_black",
+               "ir_power",
+               "crc",
+            )
+            result = {}
+            for index, name in enumerate(names):
+                result[name] = raw[index] if index < len(raw) else None
+            return result
+        else:
+            return raw
 
     def uid_hex(self):
         """[pybricks:omit] Return CH32V203 UID as a hex string."""
