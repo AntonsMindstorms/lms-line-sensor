@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f9fa">
+  <title>Line Sensor Console</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <script>
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem("line-sensor-theme") || "light";
+    } catch (_) {
+      document.documentElement.dataset.theme = "light";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="logo.svg" width="52" height="52" alt="">
+      <div>
+        <p class="eyebrow">uRemote · USB</p>
+        <h1>Line Sensor Console</h1>
+      </div>
+    </div>
+    <div class="connection">
+      <span id="connectionDot" class="dot"></span>
+      <span id="connectionText">Disconnected</span>
+      <button id="themeToggle" class="quiet theme-toggle" type="button" aria-pressed="false">Dark mode</button>
+      <button id="connectButton" class="primary">Connect USB</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero card">
+      <div>
+        <span class="label">Device UID</span>
+        <strong id="uid">—</strong>
+      </div>
+      <div class="segmented" aria-label="Sensor value mode">
+        <button id="rawMode" class="active">Raw</button>
+        <button id="calMode">Calibrated</button>
+      </div>
+      <div class="toggle-row">
+        <span>IR emitter</span>
+        <label class="switch">
+          <input id="emitter" type="checkbox">
+          <span></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="status-strip card" aria-label="Current sensor status">
+      <div class="status-item">
+        <span class="label">IR emitter</span>
+        <strong id="statusEmitter" class="status-value">—</strong>
+      </div>
+      <div class="status-item">
+        <span class="label">Sensor mode</span>
+        <strong id="statusMode" class="status-value">—</strong>
+      </div>
+      <div class="status-item">
+        <span class="label">LED mode</span>
+        <strong id="statusLedMode" class="status-value">—</strong>
+      </div>
+    </section>
+
+    <section class="card readings-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Live signal</p>
+          <h2>Sensor array</h2>
+        </div>
+        <span id="sampleMode" class="badge">RAW</span>
+      </div>
+      <div id="sensorBars" class="sensor-bars"></div>
+      <div class="position-panel">
+        <div class="position-copy">
+          <span class="label">Line position</span>
+          <strong id="positionValue">0</strong>
+        </div>
+        <div class="position-track">
+          <span class="track-label">−128</span>
+          <input id="position" type="range" min="-128" max="128" value="0" disabled>
+          <span class="track-label">128</span>
+        </div>
+        <div class="metrics">
+          <span>Min <b id="valueMin">—</b></span>
+          <span>Max <b id="valueMax">—</b></span>
+          <span>Shape <b id="shape">—</b></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow">EEPROM</p><h2>Configuration</h2></div>
+          <button id="loadConfig" class="quiet" title="Read the current configuration without applying startup settings">Refresh</button>
+        </div>
+        <div id="configFields" class="form-grid"></div>
+        <button id="saveConfig" class="primary full">Apply &amp; save</button>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow">Reference sweep</p><h2>Calibration</h2></div>
+          <span id="calState" class="badge">NOT LOADED</span>
+        </div>
+        <label class="check"><input id="saveAfterCal" type="checkbox"> Save automatically after calibration</label>
+        <button id="startCalibration" class="primary full">Start calibration</button>
+        <div class="button-row">
+          <button id="loadCalibration" class="quiet">Load EEPROM</button>
+          <button id="saveCalibration" class="quiet">Save EEPROM</button>
+          <button id="refreshCalibration" class="quiet">Refresh limits</button>
+        </div>
+        <div class="limit-table">
+          <div class="limit-row header"><span>Sensor</span><span>Min</span><span>Max</span></div>
+          <div id="calibrationLimits"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid two">
+      <section class="card">
+        <p class="eyebrow">Output test</p>
+        <h2>NeoPixel</h2>
+        <div class="pixel-controls">
+          <label>LED mode
+            <select id="ledMode">
+              <option value="0">Off</option>
+              <option value="1">Normal</option>
+              <option value="2">Inverted</option>
+              <option value="3">Position</option>
+            </select>
+          </label>
+          <label>Pixel<select id="pixelIndex"></select></label>
+          <label>Color<input id="pixelColor" type="color" value="#18d6a2"></label>
+          <button id="setPixel" class="primary">Set pixel</button>
+          <button id="clearPixels" class="quiet">Clear all</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><p class="eyebrow">On-demand diagnostics</p><h2>Command trace</h2></div>
+          <button id="refreshDebug" class="quiet">Refresh</button>
+        </div>
+        <div class="debug-status">
+          <span>Uptime <b id="uptime">—</b></span>
+          <span>I²C overflows <b id="overflows">—</b></span>
+        </div>
+        <div class="trace">
+          <span class="badge">USART1</span><code id="usartTrace">No command recorded</code>
+          <span class="badge">I²C</span><code id="i2cTrace">No command recorded</code>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
