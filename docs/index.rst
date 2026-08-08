@@ -218,6 +218,16 @@ provided directly:
 
 API reference
 -------------
+Python module reference
+***********************
+
+.. automodule:: line_sensor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Line sensor hardware register and native commands
+*************************************************
 
 .. toctree::
    :maxdepth: 2
