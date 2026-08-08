@@ -6,9 +6,6 @@ library. It retains the upstream uRemote protocol and `call()` API while using
 `pyserial` to communicate with the line sensor's USB serial port on Windows or
 Linux.
 
-The adapted source retains the upstream GPL license declaration and author
-attribution.
-
 ## Install
 
 Python 3.9 or newer is recommended. From this directory, install the only
