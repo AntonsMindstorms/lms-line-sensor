@@ -326,7 +326,11 @@ class LineSensorI2C(BaseLineSensor):
 
     def ir_power(self, power):
         self.write_command((self.CMD_SET_EMITTER, 1 if power else 0))
-
+      
+    def set_emitter(self,power):
+        """Set the IR emitter off/on."""
+        self.ir_power(power)
+      
     def leds(self, mode):
         self.current_leds_mode = mode
         self.write_command((self.CMD_LEDS, mode))
@@ -638,8 +642,8 @@ class LineSensorUR(BaseLineSensor):
         return self.ur.call("set_emitter", 1 if power else 0)
 
     def set_emitter(self, power):
-            """Set the IR emitter off/on."""
-            return self.ir_power(power)
+        """Set the IR emitter off/on."""
+        return self.ir_power(power)
     
     def get_uid(self):
         """Return 12 CH32V203 UID bytes."""
