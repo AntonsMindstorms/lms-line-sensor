@@ -180,7 +180,7 @@ def adapt_ur_for_bundle(source):
     bundle_init = """    def __init__(self, port=None, settle_ms=1):
         self.ur = uRemote(port) if port else uRemote()
         self.settle_ms = settle_ms
-        config = self.show_config()
+        config = self.get_config()
         self.version = '{}.{}'.format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
         self.cal_duration = config[self.CONFIG_CAL_DURATION]
 

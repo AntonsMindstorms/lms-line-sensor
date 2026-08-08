@@ -14,7 +14,7 @@ Regenerate the Pybricks bundle after edits:
 
 __all__ = ['BaseLineSensor', 'LineSensorI2C', 'LineSensorUR', '__version__']
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 """Shared API and constants for LMS line sensor drivers."""
 
@@ -106,12 +106,12 @@ class BaseLineSensor:
 
     def set_calibration(self, minimum, maximum):
         """Set calibration min and max arrays."""
-        self.set_min(minimum)
-        return self.set_max(maximum)
+        self.set_cal_min(minimum)
+        return self.set_cal_max(maximum)
 
-    def get_config(self, as_text=True):
+    def get_configuration(self, as_text=True):
         """Return config as a dictionary."""
-        raw = self.show_config()
+        raw = self.get_config()
         if as_text:
             names = (
                "maj_version",
@@ -135,19 +135,19 @@ class BaseLineSensor:
 
     def set_load_cal_startup(self, calibrated=True):
         """Configure whether calibration is loaded during firmware startup."""
-        return self.set_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
+        return self.set_conf_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
 
     def set_cal_duration(self, seconds):
         """Set firmware calibration duration in seconds."""
-        return self.set_value(self.CONFIG_CAL_DURATION, seconds)
+        return self.set_conf_value(self.CONFIG_CAL_DURATION, seconds)
 
     def set_shape_threshold_black(self, threshold):
         """Set the shape-detection black threshold."""
-        return self.set_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
+        return self.set_conf_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
 
     def set_ir_emitter_startup(self, emitter=True):
         """Configure emitter state after firmware startup."""
-        return self.set_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
+        return self.set_conf_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
 
     def sensors(self):
         """Read the 8 sensor channel values."""
@@ -194,22 +194,19 @@ class LineSensorI2C(BaseLineSensor):
     CMD_IS_CALIBRATED = 5
     CMD_LOAD_CAL = 6
     CMD_SAVE_CAL = 7
-    CMD_GET_MIN = 8
-    CMD_GET_MAX = 9
-    CMD_SET_MIN = 10
-    CMD_SET_MAX = 11
+    CMD_GET_CAL_MIN = 8
+    CMD_GET_CAL_MAX = 9
+    CMD_SET_CAL_MIN = 10
+    CMD_SET_CAL_MAX = 11
     CMD_NEOPIXEL = 12
     CMD_LEDS = 13
     CMD_SET_EMITTER = 14
-    CMD_GET_VALUE = 15
-    CMD_SET_VALUE = 16
-    CMD_SHOW_CONFIG = 17
+    CMD_GET_CONF_VALUE = 15
+    CMD_SET_CONF_VALUE = 16
+    CMD_GET_CONFIG = 17
     CMD_LOAD_CONFIG = 18
     CMD_SAVE_CONFIG = 19
-    CMD_GPIO_OUT = 20
-    CMD_GPIO_IN = 21
-    CMD_SERIAL_DISABLE = 22
-    CMD_SERIAL_ENABLE = 23
+    CMD_UART_TEST = 22
     CMD_GET_UID = 24
 
     def __init__(
@@ -350,11 +347,11 @@ class LineSensorI2C(BaseLineSensor):
         self.leds(mode)
 
     def get_min(self):
-        self.write_command(self.CMD_GET_MIN)
+        self.write_command(self.CMD_GET_CAL_MIN)
         return tuple(self.robust_i2c_readfrom(self.device_addr, self.SENSOR_COUNT))
 
     def get_max(self):
-        self.write_command(self.CMD_GET_MAX)
+        self.write_command(self.CMD_GET_CAL_MAX)
         return tuple(self.robust_i2c_readfrom(self.device_addr, self.SENSOR_COUNT))
 
     def get_cal_min(self):
@@ -366,12 +363,12 @@ class LineSensorI2C(BaseLineSensor):
     def set_min(self, values):
         if len(values) != self.SENSOR_COUNT:
             raise ValueError("values must contain 8 items")
-        self.write_command(tuple([self.CMD_SET_MIN] + [int(v) & 0xFF for v in values]))
+        self.write_command(tuple([self.CMD_SET_CAL_MIN] + [int(v) & 0xFF for v in values]))
 
     def set_max(self, values):
         if len(values) != self.SENSOR_COUNT:
             raise ValueError("values must contain 8 items")
-        self.write_command(tuple([self.CMD_SET_MAX] + [int(v) & 0xFF for v in values]))
+        self.write_command(tuple([self.CMD_SET_CAL_MAX] + [int(v) & 0xFF for v in values]))
 
     def set_cal_min(self, values):
         self.set_min(values)
@@ -399,11 +396,11 @@ class LineSensorI2C(BaseLineSensor):
         return bool(self.robust_i2c_readfrom(self.device_addr, 1)[0])
 
     def get_value(self, index):
-        self.write_command((self.CMD_GET_VALUE, index))
+        self.write_command((self.CMD_GET_CONF_VALUE, index))
         return self.robust_i2c_readfrom(self.device_addr, 1)[0]
 
     def set_value(self, index, value):
-        self.write_command((self.CMD_SET_VALUE, index, value))
+        self.write_command((self.CMD_SET_CONF_VALUE, index, value))
         return value
 
     def get_config_field(self, field):
@@ -412,12 +409,12 @@ class LineSensorI2C(BaseLineSensor):
     def set_config_field(self, field, value):
         return self.set_value(field, value)
 
-    def show_config(self):
-        self.write_command(self.CMD_SHOW_CONFIG)
+    def get_config(self):
+        self.write_command(self.CMD_GET_CONFIG)
         return tuple(self.robust_i2c_readfrom(self.device_addr, self.CONFIG_CRC + 1))
 
     def config(self):
-        raw = self.show_config()
+        raw = self.get_config()
         names = (
             "maj_version",
             "min_version",
@@ -453,18 +450,10 @@ class LineSensorI2C(BaseLineSensor):
     def load_config(self):
         self.write_command(self.CMD_LOAD_CONFIG)
 
-    def gpio_out(self, pin, value):
-        self.write_command((self.CMD_GPIO_OUT, pin, value))
-
-    def gpio_in(self, pin):
-        self.write_command((self.CMD_GPIO_IN, pin))
+    def uart_test(self):
+        self.write_command(self.CMD_UART_TEST)
+        wait(50)
         return self.robust_i2c_readfrom(self.device_addr, 1)[0]
-
-    def serial_disable(self):
-        self.write_command(self.CMD_SERIAL_DISABLE)
-
-    def serial_enable(self):
-        self.write_command(self.CMD_SERIAL_ENABLE)
 
     def get_uid(self):
         self.write_command(self.CMD_GET_UID)
@@ -503,7 +492,7 @@ class LineSensorUR(BaseLineSensor):
         remote = remote_class or uRemote
         self.ur = remote(port) if port else remote()
         self.settle_ms = settle_ms
-        config = self.show_config()
+        config = self.get_config()
         self.version = "{}.{}".format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
         self.cal_duration = config[self.CONFIG_CAL_DURATION]
 
@@ -511,21 +500,14 @@ class LineSensorUR(BaseLineSensor):
         """[pybricks:omit] Return the firmware millisecond counter."""
         return self.ur.call("ping")
 
-    def add(self, a, b):
-        """[pybricks:omit] Protocol self-test that returns a + b."""
-        return self.ur.call("add", a, b)
-
-    def echo(self, value):
-        """[pybricks:omit] Echo a value through the firmware print helper."""
-        return self.ur.call("print", value)
-
-    def version(self):
+    def get_version(self):
         """[pybricks:omit] Return firmware version as (major, minor)."""
-        return self._bytes_tuple(self.ur.call("get_version"))
+        version = self.ur.call("get_version")
+        return "{}.{}".format(version[0], version[1])
 
-    def debug(self, level):
-        """[pybricks:omit] Set firmware debug log level and return the active level."""
-        return self.ur.call("debug", level)
+    def debug(self):
+        """[pybricks:omit] Get debug values ( Uptime, mode, calibrated, emitter, LED mode, I2C overflow count)"""
+        return self.ur.call("debug")
 
     def mode(self, mode=None):
         """Get or set numeric mode."""
@@ -605,35 +587,35 @@ class LineSensorUR(BaseLineSensor):
         """Load calibration values from EEPROM."""
         return self.ur.call("load_cal")
 
-    def get_min(self):
+    def get_cal_min(self):
         """Return the 8 calibration minimum bytes."""
-        return self._bytes_tuple(self.ur.call("get_min"))
+        return self._bytes_tuple(self.ur.call("get_cal_min"))
 
-    def get_max(self):
+    def get_cal_max(self):
         """Return the 8 calibration maximum bytes."""
-        return self._bytes_tuple(self.ur.call("get_max"))
+        return self._bytes_tuple(self.ur.call("get_cal_max"))
 
-    def set_min(self, values):
+    def set_cal_min(self, values):
         """Set the 8 calibration minimum bytes."""
-        self._require_sensor_count(values, "set_min")
-        return self.ur.call("set_min", *values)
+        self._require_sensor_count(values, "set_cal_min")
+        return self.ur.call("set_cal_min", *values)
 
-    def set_max(self, values):
+    def set_cal_max(self, values):
         """Set the 8 calibration maximum bytes."""
-        self._require_sensor_count(values, "set_max")
-        return self.ur.call("set_max", *values)
+        self._require_sensor_count(values, "set_cal_max")
+        return self.ur.call("set_cal_max", *values)
 
-    def get_value(self, index):
+    def get_conf_value(self, index):
         """[pybricks:omit] Read one config byte by index."""
-        return self.ur.call("get_value", index)
+        return self.ur.call("get_conf_value", index)
 
-    def set_value(self, index, value):
+    def set_conf_value(self, index, value):
         """[pybricks:omit] Write one config byte by index and save config."""
-        return self.ur.call("set_value", index, value)
+        return self.ur.call("set_conf_value", index, value)
 
-    def show_config(self):
+    def get_config(self):
         """Return raw config bytes."""
-        return self._bytes_tuple(self.ur.call("show_config"))
+        return self._bytes_tuple(self.ur.call("get_config"))
 
     def load_config(self):
         """Load config from EEPROM, using firmware defaults if invalid."""
@@ -655,6 +637,10 @@ class LineSensorUR(BaseLineSensor):
         """Set the IR emitter off/on."""
         return self.ur.call("set_emitter", 1 if power else 0)
 
+    def set_emitter(self, power):
+            """Set the IR emitter off/on."""
+            return self.ir_power(power)
+    
     def get_uid(self):
         """Return 12 CH32V203 UID bytes."""
         return self._bytes_tuple(self.ur.call("get_uid"))

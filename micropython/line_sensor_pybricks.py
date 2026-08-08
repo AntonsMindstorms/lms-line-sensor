@@ -78,11 +78,11 @@ class BaseLineSensor:
             raise ValueError(method_name + ' needs 8 values')
 
     def set_calibration(self, minimum, maximum):
-        self.set_min(minimum)
-        return self.set_max(maximum)
+        self.set_cal_min(minimum)
+        return self.set_cal_max(maximum)
 
-    def get_config(self, as_text=True):
-        raw = self.show_config()
+    def get_configuration(self, as_text=True):
+        raw = self.get_config()
         if as_text:
             names = ('maj_version', 'min_version', 'load_cal_startup', 'cal_duration', 'shape_threshold_black', 'ir_power', 'crc')
             result = {}
@@ -93,16 +93,16 @@ class BaseLineSensor:
             return raw
 
     def set_load_cal_startup(self, calibrated=True):
-        return self.set_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
+        return self.set_conf_value(self.CONFIG_LOAD_CAL_STARTUP, 1 if calibrated else 0)
 
     def set_cal_duration(self, seconds):
-        return self.set_value(self.CONFIG_CAL_DURATION, seconds)
+        return self.set_conf_value(self.CONFIG_CAL_DURATION, seconds)
 
     def set_shape_threshold_black(self, threshold):
-        return self.set_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
+        return self.set_conf_value(self.CONFIG_SHAPE_THRESHOLD_BLACK, threshold)
 
     def set_ir_emitter_startup(self, emitter=True):
-        return self.set_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
+        return self.set_conf_value(self.CONFIG_IR_POWER, 1 if emitter else 0)
 
     def sensors(self):
         return self.data(self.VALUES)
@@ -316,7 +316,7 @@ class LineSensorUR(BaseLineSensor):
     def __init__(self, port=None, settle_ms=1):
         self.ur = uRemote(port) if port else uRemote()
         self.settle_ms = settle_ms
-        config = self.show_config()
+        config = self.get_config()
         self.version = '{}.{}'.format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
         self.cal_duration = config[self.CONFIG_CAL_DURATION]
 
@@ -354,22 +354,22 @@ class LineSensorUR(BaseLineSensor):
     def load_calibration(self):
         return self.ur.call('load_cal')
 
-    def get_min(self):
-        return self._bytes_tuple(self.ur.call('get_min'))
+    def get_cal_min(self):
+        return self._bytes_tuple(self.ur.call('get_cal_min'))
 
-    def get_max(self):
-        return self._bytes_tuple(self.ur.call('get_max'))
+    def get_cal_max(self):
+        return self._bytes_tuple(self.ur.call('get_cal_max'))
 
-    def set_min(self, values):
-        self._require_sensor_count(values, 'set_min')
-        return self.ur.call('set_min', *values)
+    def set_cal_min(self, values):
+        self._require_sensor_count(values, 'set_cal_min')
+        return self.ur.call('set_cal_min', *values)
 
-    def set_max(self, values):
-        self._require_sensor_count(values, 'set_max')
-        return self.ur.call('set_max', *values)
+    def set_cal_max(self, values):
+        self._require_sensor_count(values, 'set_cal_max')
+        return self.ur.call('set_cal_max', *values)
 
-    def show_config(self):
-        return self._bytes_tuple(self.ur.call('show_config'))
+    def get_config(self):
+        return self._bytes_tuple(self.ur.call('get_config'))
 
     def load_config(self):
         return self.ur.call('load_config')
@@ -385,6 +385,9 @@ class LineSensorUR(BaseLineSensor):
 
     def ir_power(self, power):
         return self.ur.call('set_emitter', 1 if power else 0)
+
+    def set_emitter(self, power):
+        return self.ir_power(power)
 
     def get_uid(self):
         return self._bytes_tuple(self.ur.call('get_uid'))
