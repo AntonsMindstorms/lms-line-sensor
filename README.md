@@ -98,6 +98,24 @@ SHAPE_Y        = 'Y'
 
 ![Microblocks example](docs/line-sensor-microblocks.png)
 
+###  Desktop Python library
+
+This si a library that can be used on a pc/desktop/laptop for using the lms-line-sensor when it is directly connected to the pc using the USB port. The library uses uRemote to communicate with the sensor. 
+
+```
+usage: read_line_sensor.py [-h] [--port PORT] [--mode {current,raw,calibrated}] [--interval INTERVAL]
+
+Read live values from the line sensor over USB uRemote.
+
+options:
+  -h, --help            show this help message and exit
+  --port PORT           Serial port (for example COM5 or /dev/ttyACM0). Omit to choose interactively.
+  --mode {current,raw,calibrated}
+                        Sensor value mode (default: keep the current mode).
+  --interval INTERVAL   Seconds between readings (default: 0.25).
+```
+
+
 ## API Overview
 
 Both `LineSensorI2C` and `LineSensorUR` expose the same core API:
