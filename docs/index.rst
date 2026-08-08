@@ -109,15 +109,8 @@ once per second while connected.
 Start the dashboard
 ~~~~~~~~~~~~~~~~~~~
 
-Web Serial requires a secure browser context. Localhost is accepted, so serve
-the directory rather than opening ``index.html`` directly:
-
-.. code-block:: console
-
-   cd web
-   python -m http.server 8000
-
-Open ``http://localhost:8000`` in Chrome or Edge, select **Connect USB**, and
+Connect the USB port of the LMS Line Sensor to the USB port of your PC. 
+Open ``https://linesensor.antonsmindstorms.com`` in Chrome or Edge, select **Connect USB**, and
 choose **Line Sensor uRemote**. Firefox and Safari do not currently provide the
 required Web Serial API.
 
