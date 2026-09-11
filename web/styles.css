@@ -85,7 +85,7 @@ h2 { font-size: 1.15rem; letter-spacing: -.015em; }
 .dot.online { background: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent); }
 .card { background: var(--card-bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--card-shadow); }
 main { display: grid; gap: 16px; padding-bottom: 42px; }
-.hero { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 28px; }
+.hero { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 28px; }
 .hero strong { display: block; margin-top: 5px; font-family: ui-monospace, monospace; letter-spacing: .08em; }
 .status-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 0; overflow: hidden; }
 .status-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 20px; background: var(--status-bg); }
@@ -105,6 +105,7 @@ main { display: grid; gap: 16px; padding-bottom: 42px; }
 .segmented button { padding: 7px 12px; color: var(--muted); }
 .segmented button.active { background: var(--panel-2); color: var(--accent); }
 .toggle-row { display: flex; align-items: center; gap: 11px; }
+.toggle-group { display: flex; align-items: center; flex-wrap: nowrap; gap: 28px; }
 .switch input { position: absolute; opacity: 0; }
 .switch span { display: block; width: 43px; height: 24px; padding: 3px; border-radius: 99px; background: var(--switch-off); transition: .2s; }
 .switch span::after { content: ""; display: block; width: 18px; height: 18px; border-radius: 50%; background: white; transition: .2s; }
