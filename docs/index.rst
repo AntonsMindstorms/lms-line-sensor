@@ -15,6 +15,7 @@ Features
 - Shape recognition for straight, T, left, right, and Y intersections.
 - EEPROM-backed calibration and configuration.
 - Configurable IR https://github.com/AntonsMindstorms/lms-line-sensor/tree/main/docsemitter.
+- Selectable black-line or white-line input polarity.
 - Eight sensor NeoPixels plus one indicator NeoPixel.
 - Automatic LED modes for values, inverted values, and line position.
 - Unique 12-byte CH32V203 device ID.
@@ -93,13 +94,13 @@ dashboard. It implements uRemote directly through the browser Web Serial API.
 The dashboard provides:
 
 - USB connection and UID display.
-- Raw/calibrated mode and emitter control.
+- Raw/calibrated mode, emitter, and black/white line control.
 - Numeric values and bar graphs for all eight sensors.
 - Signed position and shape indication.
 - Calibration start, load, save, minima, and maxima.
 - EEPROM configuration editing.
 - LED-mode and per-pixel NeoPixel tests.
-- Live emitter, sensor-mode, and LED-mode status.
+- Live emitter, sensor-mode, LED-mode, and line-type status.
 - On-demand command and runtime diagnostics.
 - Light and dark themes.
 
@@ -228,4 +229,3 @@ Line sensor hardware register and native commands
 
    API/lms-line-sensor-i2c-api
    API/lms-line-sensor-uremote-api
-

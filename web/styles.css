@@ -85,9 +85,9 @@ h2 { font-size: 1.15rem; letter-spacing: -.015em; }
 .dot.online { background: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent); }
 .card { background: var(--card-bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--card-shadow); }
 main { display: grid; gap: 16px; padding-bottom: 42px; }
-.hero { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 28px; }
+.hero { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 28px; }
 .hero strong { display: block; margin-top: 5px; font-family: ui-monospace, monospace; letter-spacing: .08em; }
-.status-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 0; overflow: hidden; }
+.status-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 0; overflow: hidden; }
 .status-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 20px; background: var(--status-bg); }
 .status-item + .status-item { border-left: 1px solid var(--line); }
 .status-value { color: var(--accent); font-size: .82rem; letter-spacing: .08em; text-transform: uppercase; }

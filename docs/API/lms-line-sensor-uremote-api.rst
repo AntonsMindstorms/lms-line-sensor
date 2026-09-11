@@ -136,8 +136,8 @@ Command reference
      - None
      - Current sensor mode
    * - ``blackline``
-     - None
-     - Legacy black-line flag; polarity detection is disabled
+     - Optional boolean
+     - Get or set line type; ``true`` keeps native readings and ``false`` applies ``255 - value``
    * - ``set_emitter``, ``emitter``
      - Off/on value
      - Set emitter; return ``1``
@@ -183,6 +183,16 @@ Configure calibrated operation:
    sensor.call("load_cal")
    sensor.call("set_mode_cal")
    values = sensor.call("data")
+
+Select white-line polarity before calibration or measurement:
+
+.. code-block:: python
+
+   enabled = sensor.call("blackline", False)
+
+Calling ``blackline`` without an argument returns the current boolean state.
+Black-line mode is the power-on default, and the setting is not saved to
+EEPROM. Recalibrate after changing line type.
 
 Set one NeoPixel manually:
 
@@ -235,4 +245,3 @@ directly. The wire format for another client implementation is:
 - Argument types are ``A`` byte array, ``B`` boolean, ``N`` ASCII number, and
   ``S`` UTF-8 string.
 - Successful replies repeat the request command name.
-

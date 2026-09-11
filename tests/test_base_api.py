@@ -69,7 +69,7 @@ class MockURemote:
             return [0] * 8
         if cmd == "get_max":
             return [255] * 8
-        if cmd == "show_config":
+        if cmd in {"show_config", "get_config"}:
             return [3, 85, 1, 5, 128, 1, 0]
         if cmd == "get_uid":
             return list(range(12))
@@ -77,6 +77,8 @@ class MockURemote:
             return [args[0]]
         if cmd == "is_calibrated":
             return [1]
+        if cmd == "blackline":
+            return args[0] if args else False
         return args[0] if cmd in {"mode", "cur_mode", "debug", "leds"} else 0
 
 
@@ -120,6 +122,7 @@ SHARED_API_METHODS = [
     "save_calibration",
     "ir_power",
     "leds",
+    "blackline",
 ]
 
 LINE_SENSOR_UR_EXTRA_METHODS = [
@@ -148,7 +151,6 @@ LINE_SENSOR_UR_EXTRA_METHODS = [
     "position_byte",
     "shape_byte",
     "current_mode",
-    "blackline",
     "mode",
     "set_load_cal_startup",
     "set_cal_duration",
@@ -244,11 +246,10 @@ class TestLineSensorI2CDataProcessing:
         """Set up a mocked LineSensorI2C instance for testing."""
         with patch.object(line_sensor.LineSensorI2C, "load_calibration"), patch.object(
             line_sensor.LineSensorI2C, "mode_calibrated"
-        ), patch.object(line_sensor.LineSensorI2C, "check_line_type"):
+        ):
             self.sensor = line_sensor.LineSensorI2C()
         self.sensor.i2c = MagicMock()
         self.sensor.current_mode = self.sensor.MODE_CALIBRATED
-        self.sensor.black_line = False
 
     def test_position_returns_scalar(self):
         """Verify position() returns a scalar, not a list."""
@@ -404,22 +405,20 @@ class TestLineSensorI2CDataProcessing:
         result = self.sensor.data(self.sensor.POSITION, self.sensor.SHAPE)
         assert result == (0, "T"), f"Expected (0, 'T'), got {result}"
 
-    def test_black_line_value_inversion(self):
-        """Verify values are inverted when black_line is True."""
+    def test_blackline_sets_firmware_polarity(self):
+        """Verify command 23 receives the requested line polarity."""
+        assert self.sensor.blackline(False) is False
+        self.sensor.i2c.writeto.assert_called_with(self.sensor.device_addr, bytes((23, 0)))
+
+        assert self.sensor.blackline(True) is True
+        self.sensor.i2c.writeto.assert_called_with(self.sensor.device_addr, bytes((23, 1)))
+
+    def test_sensor_values_are_not_inverted_by_library(self):
+        """Firmware 5.6 applies polarity before returning measurement data."""
+        raw = [10, 20, 30, 40, 50, 60, 70, 80]
+        self.sensor.i2c.readfrom.return_value = raw + [0] * 5
         self.sensor.black_line = False
-        self.sensor.i2c.readfrom.return_value = [10, 20, 30, 40, 50, 60, 70, 80] + [
-            0
-        ] * 5
-
-        # Normal (white line)
-        result = self.sensor.sensors()
-        assert result == (10, 20, 30, 40, 50, 60, 70, 80)
-
-        # Black line (inverted: 255 - value)
-        self.sensor.black_line = True
-        result = self.sensor.sensors()
-        expected = tuple(255 - v for v in [10, 20, 30, 40, 50, 60, 70, 80])
-        assert result == expected, f"Expected {expected}, got {result}"
+        assert self.sensor.sensors() == tuple(raw)
 
 
 class TestLineSensorURDataProcessing:
@@ -476,6 +475,13 @@ class TestLineSensorURDataProcessing:
     def test_mode_raw_calls_firmware_command(self):
         self.sensor.mode_raw()
         assert ("set_mode_raw", ()) in self.sensor.ur.calls
+
+    def test_blackline_gets_and_sets_firmware_polarity(self):
+        assert self.sensor.blackline() is False
+        assert ("blackline", ()) in self.sensor.ur.calls
+
+        assert self.sensor.blackline(True) is True
+        assert ("blackline", (True,)) in self.sensor.ur.calls
 
     def test_set_min_requires_eight_values(self):
         try:
@@ -538,7 +544,6 @@ class TestPackageLayout:
             "shape_byte",
             "pds_raw",
             "pdr_raw",
-            "blackline",
             "get_value",
             "set_value",
         }

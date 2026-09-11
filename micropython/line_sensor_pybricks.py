@@ -334,6 +334,11 @@ class LineSensorUR(BaseLineSensor):
         raw = self.read_all()
         return self._select_indices(raw, indices)
 
+    def blackline(self, black=None):
+        if black is None:
+            return bool(self.ur.call('blackline') or 0)
+        return bool(self.ur.call('blackline', bool(black)) or 0)
+
     def start_calibration(self, save=False):
         return self.ur.call('calibrate', 1 if save else 0)
 
