@@ -4,7 +4,7 @@ Firmware for an eight-channel reflectance line sensor based on the CH32V203.
 The sensor can be controlled through I2C, UART uRemote, or USB CDC uRemote.
 A browser dashboard and a Windows/Linux Python client are included.
 
-Current firmware version: **5.5**.
+Current firmware version: **5.6**.
 
 ## How to flash firmware on the Line Sensor board
 
@@ -25,6 +25,7 @@ Current firmware version: **5.5**.
 - Shape recognition for straight, T, left, right, and Y intersections
 - EEPROM-backed calibration and configuration
 - Configurable IR emitter
+- Selectable black-line or white-line input polarity
 - Eight sensor NeoPixels plus one indicator NeoPixel
 - Automatic LED modes for values, inverted values, and line position
 - Unique 12-byte CH32V203 device ID
@@ -56,6 +57,19 @@ dashboard before using the Python client or another serial application.
 | `1` | Calibrated | Values normalized using calibration minima and maxima |
 | `2` | Digital | Reserved compatibility mode; currently exposes raw values |
 | `3` | Calibrating | Collecting new calibration limits |
+
+## Line type and input polarity
+
+The runtime `blackline` setting selects the sensor-input polarity before raw
+values are calibrated or processed:
+
+- `true` / I2C value `1`: black-line mode; raw readings keep their native value.
+- `false` / I2C value `0`: white-line mode; every raw reading becomes
+  `255 - value`.
+
+Black-line mode is the power-on default, preserving the firmware's previous
+reading polarity. The setting is not stored in EEPROM. Recalibrate after
+changing line type so the saved minima and maxima match the selected polarity.
 
 ## Sensor packet
 
@@ -168,10 +182,11 @@ an acknowledgement; a following read returns the sensor packet.
 | `20` | Legacy | None | Do not use |
 | `21` | Legacy | None | Do not use |
 | `22` | `CMD_UART_TEST` | None | I2C-only UART TX/RX loopback result: `1` pass, `0` fail |
+| `23` | `CMD_BLACKLINE` | Line type: `0` white, `1` black | Set raw-reading polarity; no command reply |
 | `24` | `CMD_GET_UID` | None | 12 UID bytes |
 
-Command value `23` is unassigned. The former serial enable/disable commands are
-not available because UART remains dedicated to uRemote.
+The former serial enable/disable commands are not available because UART
+remains dedicated to uRemote.
 
 ### I2C example
 
@@ -188,6 +203,12 @@ packet = i2c.readfrom(ADDRESS, 13)
 values = tuple(packet[:8])
 position = packet[8] - 128
 print(values, position)
+```
+
+Select a white line, which inverts every raw channel before processing:
+
+```python
+i2c.writeto(ADDRESS, bytes([23, 0]))   # CMD_BLACKLINE: white line
 ```
 
 Reading a command-specific response:
@@ -235,12 +256,16 @@ commands and behavior.
 | `save_config` | None | Save config; returns `1` |
 | `get_uid` | None | 12-byte UID array |
 | `cur_mode` | None | Current mode |
-| `blackline` | None | Legacy black-line flag; polarity detection is disabled |
+| `blackline` | Optional boolean | Get or set line type; `true` keeps native readings and `false` applies `255 - value` |
 | `set_emitter`, `emitter` | Off/on value | Set emitter; returns `1` |
 | `leds`, `led` | Optional LED mode `0-3` | Get or set automatic LED mode |
 
 The `debug` command does not configure a debug level. It is an alias of
 `debug_status` and returns explicit diagnostic information.
+
+For example, select white-line polarity over uRemote with
+`sensor.call("blackline", False)`. Calling `blackline` without an argument
+returns the current boolean state.
 
 For a comparison with the command names used by the external LMS line-sensor
 MicroPython driver, see
@@ -284,13 +309,13 @@ dashboard. It implements uRemote directly over the browser Web Serial API.
 The dashboard provides:
 
 - USB device connection and UID display
-- Raw/calibrated mode and emitter control
+- Raw/calibrated mode, emitter, and black/white line control
 - Live numeric values and bar graphs for all eight sensors
 - Signed position display and shape indication
 - Calibration start, load, save, minima, and maxima
 - EEPROM configuration editing
 - LED mode and per-pixel NeoPixel tests
-- Live emitter, sensor-mode, and LED-mode status
+- Live emitter, sensor-mode, LED-mode, and line-type status
 - On-demand command and runtime diagnostics
 - Light and dark themes
 
@@ -321,7 +346,7 @@ Because the USB port contains framed uRemote traffic, use the dashboard rather
 than a text terminal for diagnostics:
 
 1. Connect the sensor and confirm that the connection indicator is online.
-2. Check the status strip for emitter, raw/calibrated mode, and LED mode.
+2. Check the status strip for emitter, raw/calibrated mode, LED mode, and line type.
 3. Open **On-demand diagnostics / Command trace**.
 4. Select **Refresh** to call `debug_status` and `last_commands`.
 
