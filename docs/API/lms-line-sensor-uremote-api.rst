@@ -1,7 +1,7 @@
 LMS Line Sensor uRemote API
 ===========================
 
-| Firmware reference: **5.5**
+| Firmware reference: **5.6**
 | UART speed: **115200 baud**
 | USB product: **Line Sensor uRemote**
 
@@ -136,8 +136,8 @@ Command reference
      - None
      - Current sensor mode
    * - ``blackline``
-     - None
-     - Legacy black-line flag; polarity detection is disabled
+     - Optional boolean
+     - Get or set line type; ``true`` keeps native readings and ``false`` applies ``255 - value``
    * - ``set_emitter``, ``emitter``
      - Off/on value
      - Set emitter; return ``1``
@@ -202,6 +202,16 @@ stored in EEPROM config):
    # LEDs indicate calibration; sweep black and white until it finishes.
    print("calibrated", sensor.call("is_calibrated"))
 
+Select white-line polarity before calibration or measurement:
+
+.. code-block:: python
+
+   enabled = sensor.call("blackline", False)
+
+Calling ``blackline`` without an argument returns the current boolean state.
+Black-line mode is the power-on default, and the setting is not saved to
+EEPROM. Recalibrate after changing line type.
+
 Set one NeoPixel manually:
 
 .. code-block:: python
@@ -253,4 +263,3 @@ directly. The wire format for another client implementation is:
 - Argument types are ``A`` byte array, ``B`` boolean, ``N`` ASCII number, and
   ``S`` UTF-8 string.
 - Successful replies repeat the request command name.
-

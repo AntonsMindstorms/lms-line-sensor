@@ -1,7 +1,7 @@
 LMS Line Sensor I2C API
 =======================
 
-| Firmware reference: **5.5**
+| Firmware reference: **5.6**
 | Default 7-bit slave address: **``0x33``**
 | Sensor channels: **8**
 
@@ -115,6 +115,16 @@ Sensor modes
    * - ``3``
      - Calibrating
      - Collecting new calibration limits
+
+Line type and input polarity
+----------------------------
+
+``CMD_BLACKLINE`` selects the input polarity before raw readings are
+calibrated or processed. Value ``1`` selects a black line and preserves the
+native readings. Value ``0`` selects a white line and changes every channel to
+``255 - value``. Black-line mode is the power-on default. This runtime setting
+is not stored in EEPROM; recalibrate after changing it so calibration limits
+match the selected polarity.
 
 LED modes
 ---------
@@ -245,9 +255,9 @@ Command reference
      - None
      - I2C-only UART loopback: ``1`` pass, ``0`` fail
    * - 23
-     - Unassigned
-     - None
-     - Rejected
+     - ``CMD_BLACKLINE``
+     - Line type: ``0`` white, ``1`` black
+     - Set raw-reading polarity; no command reply
    * - 24
      - ``CMD_GET_UID``
      - None
@@ -319,6 +329,12 @@ Enable the IR emitter and start calibration (save when finished):
    sleep(6)  # match EEPROM calibration duration
    i2c.writeto(ADDRESS, bytes([1]))      # CMD_SET_MODE_CAL
 
+Select white-line polarity:
+
+.. code-block:: python
+
+   i2c.writeto(ADDRESS, bytes([23, 0]))
+
 UART loopback production test
 -----------------------------
 
@@ -338,4 +354,3 @@ and reading its result:
    passed = i2c.readfrom(ADDRESS, 1)[0] == 1
 
 A missing jumper, mismatch, incomplete frame, or timeout returns ``0``.
-

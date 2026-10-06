@@ -7,9 +7,9 @@ Drivers, firmware, and tools for the [LMS Line Sensor](https://www.antonsmindsto
 
 </div>
 
-## 1. Flash the sensor (firmware 5.5)
+## 1. Flash the sensor (firmware 5.6)
 
-Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.5.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.5.uf2)
+Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.6.uf2)
 
 1. Connect the line sensor to your PC with USB.
 2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.

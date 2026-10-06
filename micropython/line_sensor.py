@@ -208,6 +208,7 @@ class LineSensorI2C(BaseLineSensor):
     CMD_LOAD_CONFIG = 18
     CMD_SAVE_CONFIG = 19
     CMD_UART_TEST = 22
+    CMD_BLACKLINE = 23
     CMD_GET_UID = 24
 
     def __init__(
@@ -240,13 +241,14 @@ class LineSensorI2C(BaseLineSensor):
 
         self.device_addr = device_addr
         self.i2c = I2C(i2c_id, scl=Pin(scl_pin), sda=Pin(sda_pin), freq=freq)
-        self.black_line = False
+        # Firmware 5.6 defaults to black-line polarity. Keep the last value
+        # written because the I2C command is write-only.
+        self.black_line = True
         self.sleep = sleep
 
         # Preserve the previous "ready after init" behavior.
         self.load_calibration()
         self.mode_calibrated()
-        self.check_line_type()
         if mode == self.MODE_RAW:
             self.mode_raw()
 
@@ -273,7 +275,7 @@ class LineSensorI2C(BaseLineSensor):
     def data(self, *indices):
         """Read sensor data and optionally return only selected packet fields."""
         raw = self._read_all()
-        return self._select_indices(raw, indices, invert_values=self.black_line)
+        return self._select_indices(raw, indices)
 
     def write_command(self, command):
         """Write a numeric command or command-byte sequence to the sensor."""
@@ -299,19 +301,17 @@ class LineSensorI2C(BaseLineSensor):
         """Save calibration minima and maxima to sensor EEPROM."""
         self.write_command(self.CMD_SAVE_CAL)
 
-    def check_line_type(self):
-        """Detect whether the calibrated line is darker or lighter than its field."""
-        values = list(self.robust_i2c_readfrom(self.device_addr, self.SENSOR_COUNT))
-        average = sum(values) // len(values)
-        self.black_line = average > 128
-        print("Line is", "black" if self.black_line else "white")
+    def blackline(self, black):
+        """Set firmware polarity: true for a black line, false for a white line."""
+        self.black_line = bool(black)
+        self.write_command((self.CMD_BLACKLINE, 1 if self.black_line else 0))
+        return self.black_line
 
     def calibrate(self, duration=5):
         """Run firmware calibration for ``duration`` seconds and save the result."""
         self.set_cal_duration(int(duration))
         self.start_calibration(save=True)
         self.sleep(duration + 1)
-        self.check_line_type()
 
     def ir_power(self, power):
         """Turn the IR emitter on or off."""
@@ -585,9 +585,11 @@ class LineSensorUR(BaseLineSensor):
         """[pybricks:omit] Compatibility alias for pds_raw()."""
         return self._bytes_tuple(self.ur.call("pdr"))
 
-    def blackline(self):
-        """[pybricks:omit] Return True when firmware reports black-line mode."""
-        return bool(self.ur.call("blackline") or 0)
+    def blackline(self, black=None):
+        """Get line polarity, or set it when a boolean argument is supplied."""
+        if black is None:
+            return bool(self.ur.call("blackline") or 0)
+        return bool(self.ur.call("blackline", bool(black)) or 0)
 
     def start_calibration(self, save=False):
         """Start calibration. Pass save=True to store calibration when firmware stops."""
