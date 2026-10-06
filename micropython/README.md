@@ -50,6 +50,10 @@ while True:
    wait(100)
 ```
 
+Inside `run_task()` / `multitask()`, every `LineSensorUR` method returns an
+awaitable instead, so write `await line.read_all()`. The library detects this by
+itself; there are no separate async methods.
+
 ## `line_sensor_ur_server.py`
 
 This is a uRemote server that runs on the LMS-ESP32. It subclasses the frozen `uRemote` library and serves an I2C-connected line sensor.

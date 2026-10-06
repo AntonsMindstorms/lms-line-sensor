@@ -1,10 +1,11 @@
 """Transform line_sensor sources into a slim Pybricks upload bundle."""
 
 import ast
-import re
 import textwrap
 
 PYBRICKS_OMIT_TAG = "[pybricks:omit]"
+
+FUNCTION_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
 
 BASE_OMIT_CONSTANTS = frozenset({"MODE_SAVING", "MODE_DIGITAL", "MODE_CALIBRATING", "MIN", "MAX"})
 
@@ -82,7 +83,7 @@ def _replace_class_methods(class_node, replacements):
 
     new_body = []
     for item in class_node.body:
-        if isinstance(item, ast.FunctionDef) and item.name in parsed:
+        if isinstance(item, FUNCTION_NODES) and item.name in parsed:
             new_body.append(parsed[item.name])
         else:
             new_body.append(item)
@@ -107,7 +108,7 @@ def transform_module(source, *, omit_tagged_methods=False, slim_base=False, stri
 
         new_body = []
         for item in node.body:
-            if isinstance(item, ast.FunctionDef):
+            if isinstance(item, FUNCTION_NODES):
                 if omit_tagged_methods and is_pybricks_omit(item):
                     continue
                 if strip_docstrings:
@@ -126,7 +127,7 @@ def pybricks_omit_methods(source, class_name=None):
             if class_name and node.name != class_name:
                 continue
             for item in node.body:
-                if isinstance(item, ast.FunctionDef) and is_pybricks_omit(item):
+                if isinstance(item, FUNCTION_NODES) and is_pybricks_omit(item):
                     omitted.append(item.name)
     return omitted
 
@@ -137,7 +138,7 @@ def bundle_ur_methods(source):
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and node.name == "LineSensorUR":
             for item in node.body:
-                if isinstance(item, ast.FunctionDef) and not item.name.startswith("_"):
+                if isinstance(item, FUNCTION_NODES) and not item.name.startswith("_"):
                     if not is_pybricks_omit(item):
                         methods.append(item.name)
     return methods
@@ -175,14 +176,100 @@ def adapt_ur_for_bundle(source):
         lines.append(line)
         i += 1
 
-    text = "\n".join(lines)
-    init_pattern = r"    def __init__\(self, port=None, settle_ms=1, remote_class=None\):.*?(?=\n    def )"
-    bundle_init = """    def __init__(self, port=None, settle_ms=1):
-        self.ur = uRemote(port) if port else uRemote()
-        self.settle_ms = settle_ms
-        config = self.get_config()
-        self.version = '{}.{}'.format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
-        self.cal_duration = config[self.CONFIG_CAL_DURATION]
+    # uRemote and uRemoteError are module globals in the bundle.
+    return "\n".join(line for line in lines if line.strip() != "from uremote import uRemote, uRemoteError")
 
-"""
-    return re.sub(init_pattern, bundle_init, text, count=1, flags=re.DOTALL)
+
+UREMOTE_SERVER_ONLY = frozenset({"process", "_send_command", "_recv_command"})
+UREMOTE_ESP32_ARGS = frozenset({"rx", "tx"})
+
+
+class _PybricksOnly(ast.NodeTransformer):
+    """Fold ``_IS_PYBRICKS`` to True and drop the ESP32 branches."""
+
+    def _truth(self, test):
+        if isinstance(test, ast.Name) and test.id == "_IS_PYBRICKS":
+            return True
+        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+            inner = self._truth(test.operand)
+            return None if inner is None else not inner
+        if isinstance(test, ast.Compare) and isinstance(test.left, ast.Constant):
+            if test.left.value == "Pybricks":
+                return True
+        return None
+
+    def visit_If(self, node):
+        self.generic_visit(node)
+        truth = self._truth(node.test)
+        if truth is None:
+            return node
+        return (node.body if truth else node.orelse) or None
+
+    def visit_BoolOp(self, node):
+        self.generic_visit(node)
+        if isinstance(node.op, ast.And):
+            values = [v for v in node.values if self._truth(v) is not True]
+            if len(values) == 1:
+                return values[0]
+            node.values = values
+        return node
+
+
+def _is_dunder_or_platform_assign(node):
+    if not isinstance(node, ast.Assign):
+        return False
+    names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+    return any(n.startswith("__") or n == "_IS_PYBRICKS" for n in names)
+
+
+def _is_optional_import(node):
+    # try: from micropython import const / from lms_esp32 import RX_PIN
+    if not isinstance(node, ast.Try):
+        return False
+    first = node.body[0]
+    return isinstance(first, ast.ImportFrom) and first.module in {"micropython", "lms_esp32"}
+
+
+def _drop_args(func, names):
+    args = func.args
+    first_default = len(args.args) - len(args.defaults)
+    kept, defaults = [], []
+    for i, arg in enumerate(args.args):
+        if arg.arg in names:
+            continue
+        kept.append(arg)
+        if i >= first_default:
+            defaults.append(args.defaults[i - first_default])
+    args.args, args.defaults = kept, defaults
+
+
+def trim_uremote_for_pybricks(source):
+    """Return the Pybricks client part of upstream ``uremote.py``.
+
+    Drops the ESP32 branches, the server side, dunder metadata and
+    docstrings, so the bundle stays small while the transport logic lives
+    only in the uRemote submodule.
+    """
+    tree = _PybricksOnly().visit(ast.parse(source))
+    body = [ast.parse("def const(value):\n    return value").body[0]]
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            continue
+        if _is_optional_import(node) or _is_dunder_or_platform_assign(node):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+            continue
+        if isinstance(node, ast.ClassDef):
+            _strip_function_docstring(node)
+            node.body = [
+                item for item in node.body
+                if not (isinstance(item, FUNCTION_NODES) and item.name in UREMOTE_SERVER_ONLY)
+            ]
+            for item in node.body:
+                if isinstance(item, FUNCTION_NODES):
+                    _strip_function_docstring(item)
+                    if item.name == "__init__":
+                        _drop_args(item, UREMOTE_ESP32_ARGS)
+        body.append(node)
+    tree.body = body
+    return ast.unparse(ast.fix_missing_locations(tree))

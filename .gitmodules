@@ -1,0 +1,4 @@
+[submodule "micropython/vendor/uRemote"]
+	path = micropython/vendor/uRemote
+	url = https://github.com/AntonsMindstorms/uRemote.git
+	branch = feature/auto-async

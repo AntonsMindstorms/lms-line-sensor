@@ -3,7 +3,7 @@
 Desktop Python client for the line sensor over USB serial (pyserial adaptation
 of uRemote 1.3). LMS-ESP32 uses a frozen `uremote`; the Pybricks hub driver
 embeds a trimmed client via `line_sensor_pybricks.py`. Full upstream copy:
-`micropython/vendor/uremote.py`.
+`micropython/vendor/uRemote/library/uremote.py` (git submodule).
 
 Based on [AntonsMindstorms uRemote 1.3](https://github.com/AntononsMindstorms/uRemote/blob/main/library/uremote.py).
 

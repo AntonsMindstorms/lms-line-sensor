@@ -101,38 +101,56 @@ class BaseLineSensor:
             return tuple(value)
         return (value,)
 
+    def _then(self, result, *steps):
+        """Feed ``result`` through ``steps``, awaiting when a step is async.
+
+        Every call returns a plain value when nothing is awaitable. Once a
+        result is awaitable (uRemote inside Pybricks ``run_task()``), the rest
+        of the chain runs in a coroutine, so callers ``await`` the method.
+        """
+        for i, step in enumerate(steps):
+            if hasattr(result, "send"):
+                return self._finish_async(result, steps[i:])
+            result = step(result)
+        return result
+
+    async def _finish_async(self, pending, steps):
+        result = await pending
+        for step in steps:
+            result = step(result)
+            if hasattr(result, "send"):
+                result = await result
+        return result
+
     def _require_sensor_count(self, values, method_name):
         if len(values) != self.SENSOR_COUNT:
             raise ValueError(method_name + " needs 8 values")
 
     def set_calibration(self, minimum, maximum):
         """Set calibration min and max arrays."""
-        self.set_cal_min(minimum)
-        return self.set_cal_max(maximum)
+        return self._then(self.set_cal_min(minimum), lambda _: self.set_cal_max(maximum))
 
     def get_configuration(self, as_text=True):
         """Return config as a dictionary."""
-        raw = self.get_config()
-        if as_text:
-            names = (
-               "maj_version",
-               "min_version",
-               "load_cal_startup",
-               "cal_duration",
-               "shape_threshold_black",
-               "ir_power",
-               "crc",
-            )
-            result = {}
-            for index, name in enumerate(names):
-                result[name] = raw[index] if index < len(raw) else None
-            return result
-        else:
-            return raw
+        if not as_text:
+            return self.get_config()
+        names = (
+            "maj_version",
+            "min_version",
+            "load_cal_startup",
+            "cal_duration",
+            "shape_threshold_black",
+            "ir_power",
+            "crc",
+        )
+        return self._then(
+            self.get_config(),
+            lambda raw: {name: raw[i] if i < len(raw) else None for i, name in enumerate(names)},
+        )
 
     def uid_hex(self):
         """[pybricks:omit] Return CH32V203 UID as a hex string."""
-        return "".join("%02x" % byte for byte in self.get_uid())
+        return self._then(self.get_uid(), lambda uid: "".join("%02x" % byte for byte in uid))
 
     def set_load_cal_startup(self, calibrated=True):
         """Configure whether calibration is loaded during firmware startup."""
@@ -519,9 +537,21 @@ class LineSensorUR(BaseLineSensor):
         remote = remote_class or uRemote
         self.ur = remote(port) if port else remote()
         self.settle_ms = settle_ms
-        config = self.get_config()
-        self.version = "{}.{}".format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
-        self.cal_duration = config[self.CONFIG_CAL_DURATION]
+        self.version = self.cal_duration = None
+        # Fills version and cal_duration now; inside run_task() the read is
+        # skipped and happens on the first awaited get_config() instead.
+        self.get_config()
+
+    def _wait(self, ms):
+        # Pybricks wait() blocks outside run_task() and is awaitable inside it.
+        pending = wait(ms) if ms else None
+        return None if pending is None else self._finish_async(pending, ())
+
+    def _call_bytes(self, cmd, *args):
+        return self._then(self.ur.call(cmd, *args), self._bytes_tuple)
+
+    def _call_bool(self, cmd, *args):
+        return self._then(self.ur.call(cmd, *args), lambda value: bool(value or 0))
 
     def ping(self):
         """[pybricks:omit] Return the firmware millisecond counter."""
@@ -529,8 +559,7 @@ class LineSensorUR(BaseLineSensor):
 
     def get_version(self):
         """[pybricks:omit] Return firmware version as (major, minor)."""
-        version = self.ur.call("get_version")
-        return "{}.{}".format(version[0], version[1])
+        return self._then(self.ur.call("get_version"), lambda v: "{}.{}".format(v[0], v[1]))
 
     def debug(self):
         """[pybricks:omit] Get debug values ( Uptime, mode, calibrated, emitter, LED mode, I2C overflow count)"""
@@ -556,18 +585,15 @@ class LineSensorUR(BaseLineSensor):
 
     def read_all(self):
         """Read all 13 sensor/result bytes from firmware."""
-        if self.settle_ms:
-            wait(self.settle_ms)
-        return self._bytes_tuple(self.ur.call("all"))
+        return self._then(self._wait(self.settle_ms), lambda _: self._call_bytes("all"))
 
     def read_sensors(self):
         """[pybricks:omit] Read only the 8 sensor bytes from firmware."""
-        return self._bytes_tuple(self.ur.call("data"))
+        return self._call_bytes("data")
 
     def data(self, *indices):
         """Read sensor data with optional index-based filtering."""
-        raw = self.read_all()
-        return self._select_indices(raw, indices)
+        return self._then(self.read_all(), lambda raw: self._select_indices(raw, indices))
 
     def position_byte(self):
         """[pybricks:omit] Read raw position byte, 0..255, centered around 128."""
@@ -579,17 +605,17 @@ class LineSensorUR(BaseLineSensor):
 
     def pds_raw(self):
         """[pybricks:omit] Read raw position, derivative, shape bytes."""
-        return self._bytes_tuple(self.ur.call("pds"))
+        return self._call_bytes("pds")
 
     def pdr_raw(self):
         """[pybricks:omit] Compatibility alias for pds_raw()."""
-        return self._bytes_tuple(self.ur.call("pdr"))
+        return self._call_bytes("pdr")
 
     def blackline(self, black=None):
         """Get line polarity, or set it when a boolean argument is supplied."""
         if black is None:
-            return bool(self.ur.call("blackline") or 0)
-        return bool(self.ur.call("blackline", bool(black)) or 0)
+            return self._call_bool("blackline")
+        return self._call_bool("blackline", bool(black))
 
     def start_calibration(self, save=False):
         """Start calibration. Pass save=True to store calibration when firmware stops."""
@@ -597,16 +623,17 @@ class LineSensorUR(BaseLineSensor):
 
     def calibrate(self, duration=None, save=True):
         """Start calibration, wait, and optionally save."""
-        self.leds(self.LEDS_OFF)
-        self.start_calibration(save=save)
-        if duration is None:
-            duration = self.cal_duration
-        wait(1000 * (duration + 1))
-        return self.is_calibrated()
+        return self._then(
+            self.leds(self.LEDS_OFF),
+            lambda _: self.start_calibration(save=save),
+            lambda _: self.get_config() if duration is None and self.cal_duration is None else None,
+            lambda _: self._wait(1000 * ((self.cal_duration if duration is None else duration) + 1)),
+            lambda _: self.is_calibrated(),
+        )
 
     def is_calibrated(self):
         """Return True when calibration data is active."""
-        return bool(self.ur.call("is_calibrated") or 0)
+        return self._call_bool("is_calibrated")
 
     def save_calibration(self):
         """Save calibration values to EEPROM."""
@@ -618,11 +645,11 @@ class LineSensorUR(BaseLineSensor):
 
     def get_cal_min(self):
         """Return the 8 calibration minimum bytes."""
-        return self._bytes_tuple(self.ur.call("get_cal_min"))
+        return self._call_bytes("get_cal_min")
 
     def get_cal_max(self):
         """Return the 8 calibration maximum bytes."""
-        return self._bytes_tuple(self.ur.call("get_cal_max"))
+        return self._call_bytes("get_cal_max")
 
     def set_cal_min(self, values):
         """Set the 8 calibration minimum bytes."""
@@ -643,8 +670,13 @@ class LineSensorUR(BaseLineSensor):
         return self.ur.call("set_conf_value", index, value)
 
     def get_config(self):
-        """Return raw config bytes."""
-        return self._bytes_tuple(self.ur.call("get_config"))
+        """Return raw config bytes and refresh ``version`` and ``cal_duration``."""
+        return self._then(self._call_bytes("get_config"), self._remember_config)
+
+    def _remember_config(self, config):
+        self.version = "{}.{}".format(config[self.CONFIG_MAJ_VERSION], config[self.CONFIG_MIN_VERSION])
+        self.cal_duration = config[self.CONFIG_CAL_DURATION]
+        return config
 
     def load_config(self):
         """Load config from EEPROM, using firmware defaults if invalid."""
@@ -669,7 +701,7 @@ class LineSensorUR(BaseLineSensor):
     def set_emitter(self, power):
         """Set the IR emitter off/on."""
         return self.ir_power(power)
-    
+
     def get_uid(self):
         """Return 12 CH32V203 UID bytes."""
-        return self._bytes_tuple(self.ur.call("get_uid"))
+        return self._call_bytes("get_uid")

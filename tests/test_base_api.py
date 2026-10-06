@@ -1,5 +1,6 @@
 """Tests for the LMS Line Sensor package and standalone Pybricks artifact."""
 
+import asyncio
 import sys
 import types
 from pathlib import Path
@@ -49,6 +50,8 @@ class MockURemoteError(Exception):
 
 
 class MockURemote:
+    """Sync stand-in for uRemote; AsyncMockURemote mimics run_task() mode."""
+
     def __init__(self, port=None):
         self.port = port
         self.calls = []
@@ -81,6 +84,18 @@ class MockURemote:
         if cmd == "blackline":
             return args[0] if args else False
         return args[0] if cmd in {"mode", "cur_mode", "debug", "leds"} else 0
+
+
+class AsyncMockURemote(MockURemote):
+    """uRemote inside Pybricks run_task(): call() returns an awaitable."""
+
+    def call(self, cmd, *args):
+        # Like uRemote, nothing is sent until the awaitable runs.
+        async def reply():
+            await asyncio.sleep(0)
+            return MockURemote.call(self, cmd, *args)
+
+        return reply()
 
 
 uremote_module = types.ModuleType("uremote")
@@ -502,10 +517,10 @@ class TestLineSensorURDataProcessing:
 
     def test_calibrate_matches_updated_flow(self):
         self.sensor.cal_duration = 5
-        with patch.object(line_sensor.LineSensorUR, "leds"), patch.object(
-            line_sensor.LineSensorUR, "start_calibration"
+        with patch.object(line_sensor.LineSensorUR, "leds", return_value=None), patch.object(
+            line_sensor.LineSensorUR, "start_calibration", return_value=None
         ) as start_calibration, patch(
-            "line_sensor.wait"
+            "line_sensor.wait", return_value=None
         ) as wait_mock, patch.object(
             line_sensor.LineSensorUR, "is_calibrated", return_value=True
         ) as is_calibrated:
@@ -515,6 +530,139 @@ class TestLineSensorURDataProcessing:
         wait_mock.assert_called_once_with(6000)
         is_calibrated.assert_called_once_with()
         assert result is True
+
+
+class TestLineSensorURAsync:
+    """Same API under run_task(): methods return awaitables, no new names."""
+
+    def setup_method(self):
+        self.sensor = line_sensor.LineSensorUR(
+            port="B", settle_ms=0, remote_class=AsyncMockURemote
+        )
+
+    def run(self, awaitable):
+        return asyncio.run(self._await(awaitable))
+
+    @staticmethod
+    async def _await(awaitable):
+        return await awaitable
+
+    def test_constructor_defers_config_until_awaited(self):
+        assert self.sensor.version is None
+        assert self.run(self.sensor.get_config()) == (3, 85, 1, 5, 128, 1, 0)
+        assert self.sensor.version == "3.85"
+        assert self.sensor.cal_duration == 5
+
+    def test_reads_return_awaitables_with_decoded_values(self):
+        assert self.run(self.sensor.position()) == 0
+        assert self.run(self.sensor.sensors()) == (10, 20, 30, 40, 50, 60, 70, 80)
+        assert self.run(self.sensor.position_derivative_shape()) == (0, 0, "|")
+        assert self.run(self.sensor.is_calibrated()) is True
+        assert self.run(self.sensor.uid_hex()) == "000102030405060708090a0b"
+        assert self.run(self.sensor.get_configuration())["cal_duration"] == 5
+
+    def test_settle_wait_is_awaited(self):
+        waited = []
+
+        async def fake_wait(ms):
+            waited.append(ms)
+
+        self.sensor.settle_ms = 2
+        with patch("line_sensor.wait", lambda ms: fake_wait(ms)):
+            assert self.run(self.sensor.shape()) == "|"
+        assert waited == [2]
+
+    def test_calibrate_awaits_every_step_in_order(self):
+        waited = []
+
+        async def fake_wait(ms):
+            waited.append(ms)
+
+        with patch("line_sensor.wait", lambda ms: fake_wait(ms)):
+            assert self.run(self.sensor.calibrate(save=True)) is True
+        assert [c[0] for c in self.sensor.ur.calls] == [
+            "leds", "calibrate", "get_config", "is_calibrated"
+        ]
+        assert waited == [6000]
+
+    def test_set_calibration_sends_both_tables(self):
+        self.run(self.sensor.set_calibration([0] * 8, [255] * 8))
+        assert [c[0] for c in self.sensor.ur.calls] == ["set_cal_min", "set_cal_max"]
+
+
+class BundleUART:
+    """Fake UARTDevice answering uRemote frames like the sensor firmware."""
+
+    REPLIES = {
+        "get_config": (3, 85, 1, 5, 128, 1, 0),
+        "all": (10, 20, 30, 40, 50, 60, 70, 80, 140, 0, 200, 128, 124),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.rx = bytearray()
+
+    def set_baudrate(self, baudrate):
+        pass
+
+    def waiting(self):
+        return len(self.rx)
+
+    def read_all(self):
+        data, self.rx = bytes(self.rx), bytearray()
+        return data
+
+    def read(self, n=1):
+        data, self.rx = bytes(self.rx[:n]), self.rx[n:]
+        return data
+
+    def write(self, frame):
+        codec = line_sensor_pybricks.uRemote  # frame helpers do not use self
+        _, cmd, _ = codec._decode(None, frame[5:])
+        self.rx += codec._packet(None, codec._encode(None, 0, cmd, *self.REPLIES[cmd]))
+
+
+class AsyncBundleUART(BundleUART):
+    async def read(self, n=1):
+        return BundleUART.read(self, n)
+
+    async def write(self, frame):
+        BundleUART.write(self, frame)
+
+
+class TestPybricksBundleEndToEnd:
+    """The generated bundle talks real uRemote frames in both modes."""
+
+    def make_sensor(self, monkeypatch, uart_class, in_run_task):
+        ticks = iter(range(10**6))
+
+        class StopWatch:
+            def time(self):
+                return next(ticks)
+
+        async def async_wait(ms):
+            await asyncio.sleep(0)
+
+        monkeypatch.setattr(line_sensor_pybricks, "UARTDevice", uart_class)
+        monkeypatch.setattr(line_sensor_pybricks, "StopWatch", StopWatch)
+        monkeypatch.setattr(line_sensor_pybricks, "run_task", lambda: in_run_task)
+        monkeypatch.setattr(
+            line_sensor_pybricks, "wait", async_wait if in_run_task else (lambda ms: None)
+        )
+        return line_sensor_pybricks.LineSensorUR("A", settle_ms=0)
+
+    def test_blocking_outside_run_task(self, monkeypatch):
+        sensor = self.make_sensor(monkeypatch, BundleUART, in_run_task=False)
+        assert sensor.version == "3.85"
+        assert sensor.position() == 12
+
+    def test_awaitable_inside_run_task(self, monkeypatch):
+        sensor = self.make_sensor(monkeypatch, AsyncBundleUART, in_run_task=True)
+
+        async def main():
+            assert sensor.version is None
+            return await sensor.position(), await sensor.get_config(), sensor.version
+
+        assert asyncio.run(main()) == (12, (3, 85, 1, 5, 128, 1, 0), "3.85")
 
 
 class TestPackageLayout:
