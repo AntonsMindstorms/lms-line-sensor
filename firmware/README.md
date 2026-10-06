@@ -2,7 +2,11 @@
 
 Firmware for an eight-channel reflectance line sensor based on the CH32V203.
 The sensor can be controlled through I2C, UART uRemote, or USB CDC uRemote.
-A browser dashboard and a Windows/Linux Python client are included.
+A browser dashboard (`web/`) and a desktop Python client (`usb/`) are included.
+
+**This file is the canonical hardware / firmware reference** (flashing, packets,
+EEPROM, LED modes, command tables). Software onboarding lives in the root
+`README.md` and `docs/index.rst`.
 
 Current firmware version: **5.5**.
 
@@ -31,7 +35,7 @@ Current firmware version: **5.5**.
 - I2C slave interface at address `0x33`
 - Named uRemote API on UART and native USB CDC
 - Browser dashboard for configuration, calibration, visualization, and diagnostics
-- Desktop Python uRemote library for Windows and Linux
+- Desktop Python uRemote library for Windows, macOS, and Linux (`usb/`)
 
 ## Interfaces
 
@@ -248,12 +252,12 @@ MicroPython driver, see
 
 ## Python USB client
 
-The [`library`](library/) directory contains a desktop adaptation of
-`uremote.py`, a port-selection helper, and a live-reading example for Windows
-and Linux.
+The [`usb`](../usb/) directory contains a desktop adaptation of
+`uremote.py`, a port-selection helper, and a live-reading example for Windows,
+macOS, and Linux.
 
 ```text
-cd library
+cd usb
 python -m pip install -r requirements.txt
 python read_line_sensor.py
 ```
