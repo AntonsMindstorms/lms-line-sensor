@@ -6,6 +6,8 @@ Full walkthrough: [8-Channel Line Follower on SPIKE Prime: LMS-ESP32 + Pybricks]
 
 This example runs a PD line follower on SPIKE Prime with Pybricks. The 8-channel line sensor connects to an LMS-ESP32 board over Qwiic; the board bridges I2C to the hub with [PUPRemote](https://docs.pybricks.com/en/latest/pupremote/index.html). The sensor publishes position, derivative, and track shape every loop; the hub steers two motors and handles calibration.
 
+For the same Qwiic wiring with the native uRemote command set (`LineSensorUR` on the hub, `LineSensorURServer` on the ESP32), see [`../lms-esp32-ur-server/`](../lms-esp32-ur-server/).
+
 Tested on RoboCup tiles — sharp turns and junction shapes stress-test the onboard shape detection.
 
 ## Files

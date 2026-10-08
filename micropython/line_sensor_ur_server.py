@@ -1,42 +1,34 @@
-"""uRemote-to-I2C bridge for the LMS 8-channel line sensor.
+"""uRemote server for an I2C-connected LMS 8-channel line sensor.
 
 Run this module on an LMS-ESP32 when the wiring is:
 
     Pybricks hub -- UART/uRemote --> LMS-ESP32 -- I2C/Qwiic --> line sensor
 
-The Pybricks side can use the same ``LineSensorUR`` client that is used when
-connecting the line sensor directly to a hub. The bridge exposes the native
-line-sensor uRemote command names and forwards them to ``LineSensorI2C``.
+``LineSensorURServer`` subclasses the frozen LMS-ESP32 ``uRemote`` library and
+exposes the native line-sensor uRemote command names, forwarding them to
+``LineSensorI2C``. The Pybricks side can use the same ``LineSensorUR`` client
+as when the sensor is wired directly to a hub.
 
-Required files on the LMS-ESP32:
+Required on the LMS-ESP32:
 
-* ``line_sensor.py`` from the lms-line-sensor repository
-* ``uremote.py`` from the uRemote repository
-* this file
+* ``line_sensor.py`` from this repository
+* this file (``uremote`` is frozen on current LMS-ESP32 firmware)
 
-The current uRemote implementation resolves server functions in ``__main__``.
-This bridge first dispatches its native line-sensor commands locally and then
-falls back to functions defined in the main program. This allows one uRemote
-connection to expose both the sensor API and application-specific commands.
-Line-sensor commands take priority when an application function has the same
-name.
+This server first dispatches native line-sensor commands locally and then
+falls back to functions defined in the main program. One uRemote connection
+can expose both the sensor API and application-specific commands. Line-sensor
+commands take priority when an application function has the same name.
 """
 
 import __main__
 
 try:
-    from time import ticks_add, ticks_diff, ticks_ms, sleep_ms
+    from time import ticks_ms, sleep_ms
 except ImportError:  # CPython fallback for tests and documentation builds.
     import time as _time
 
     def ticks_ms():
         return int(_time.monotonic() * 1000)
-
-    def ticks_add(value, delta):
-        return value + delta
-
-    def ticks_diff(value, reference):
-        return value - reference
 
     def sleep_ms(milliseconds):
         _time.sleep(milliseconds / 1000.0)
@@ -47,12 +39,11 @@ from uremote import STATUS_ERR, STATUS_OK, uRemote
 __version__ = "0.4.0"
 
 
-class LineSensorI2CuRemoteBridge:
-    """Expose the native line-sensor uRemote API through an I2C sensor.
+class LineSensorURServer(uRemote):
+    """uRemote server that serves an I2C line sensor on LMS-ESP32.
 
     Args:
         sensor: Optional existing ``LineSensorI2C`` instance.
-        remote: Optional existing ``uRemote`` server instance.
         i2c_id: MicroPython I2C controller number.
         scl_pin: LMS-ESP32 I2C clock pin.
         sda_pin: LMS-ESP32 I2C data pin.
@@ -64,13 +55,11 @@ class LineSensorI2CuRemoteBridge:
         uart_timeout: UART read timeout in milliseconds.
         rx: Optional UART RX pin override.
         tx: Optional UART TX pin override.
-        calibration_grace_ms: Small delay added before ``cur_mode`` changes
-            from calibrating back to the previous mode.
     """
 
     MODE_RAW = 0
     MODE_CALIBRATED = 1
-    MODE_SAVING = 2
+    MODE_DIGITAL = 2
     MODE_CALIBRATING = 3
 
     SENSOR_COUNT = 8
@@ -84,7 +73,6 @@ class LineSensorI2CuRemoteBridge:
     def __init__(
         self,
         sensor=None,
-        remote=None,
         i2c_id=1,
         scl_pin=4,
         sda_pin=5,
@@ -96,8 +84,20 @@ class LineSensorI2CuRemoteBridge:
         uart_timeout=1000,
         rx=None,
         tx=None,
-        calibration_grace_ms=50,
     ):
+        remote_args = {
+            "baudrate": baudrate,
+            "wait_recv": wait_recv,
+            "uart_timeout": uart_timeout,
+        }
+        # Do not pass None explicitly: uRemote then keeps the LMS-ESP32
+        # defaults imported from lms_esp32.py.
+        if rx is not None:
+            remote_args["rx"] = rx
+        if tx is not None:
+            remote_args["tx"] = tx
+        super().__init__(uart_id, **remote_args)
+
         if sensor is None:
             sensor = LineSensorI2C(
                 i2c_id=i2c_id,
@@ -108,44 +108,12 @@ class LineSensorI2CuRemoteBridge:
             )
         self.sensor = sensor
 
-        if remote is None:
-            remote_args = {
-                "baudrate": baudrate,
-                "wait_recv": wait_recv,
-                "uart_timeout": uart_timeout,
-            }
-            # Do not pass None explicitly: uRemote then keeps the LMS-ESP32
-            # defaults imported from lms_esp32.py.
-            if rx is not None:
-                remote_args["rx"] = rx
-            if tx is not None:
-                remote_args["tx"] = tx
-            remote = uRemote(uart_id, **remote_args)
-        self.remote = remote
-
-        current_mode = getattr(sensor, "current_mode", self.MODE_CALIBRATED)
-        if current_mode not in (self.MODE_RAW, self.MODE_CALIBRATED):
-            current_mode = self.MODE_CALIBRATED
-        self._mode = current_mode
-        self._previous_mode = current_mode
-
-        self._led_mode = getattr(sensor, "current_leds_mode", 0)
-        self._previous_led_mode = self._led_mode
-        try:
-            self._emitter_state = 1 if sensor.get_value(sensor.CONFIG_IR_POWER) else 0
-        except Exception:
-            self._emitter_state = 0
-
         self._last_uart_command = "-"
         self._last_uart_parameters = ""
         self._last_uart_timestamp = 0
         self._last_i2c_command = "-"
         self._last_i2c_parameters = ""
         self._last_i2c_timestamp = 0
-
-        self._calibrating = False
-        self._calibration_deadline = 0
-        self._calibration_grace_ms = max(0, int(calibration_grace_ms))
 
         self._handlers = {
             "ping": self.ping,
@@ -260,41 +228,10 @@ class LineSensorI2CuRemoteBridge:
             # Native clients normally use only 0 and 1. Passing other values
             # to the I2C device would collide with I2C command identifiers.
             raise ValueError("mode must be 0 (raw) or 1 (calibrated)")
-
-        self._calibrating = False
-        self._mode = new_mode
-        self._previous_mode = new_mode
         return new_mode
 
-    def _service_state(self):
-        if not self._calibrating:
-            return
-        if ticks_diff(ticks_ms(), self._calibration_deadline) < 0:
-            return
-
-        # The sensor firmware owns the calibration timer and restores its
-        # previous mode and LED mode. Mirror that state locally for cur_mode().
-        self._calibrating = False
-        self._mode = self._previous_mode
-        self._led_mode = self._previous_led_mode
-
-        if hasattr(self.sensor, "current_mode"):
-            self.sensor.current_mode = self._mode
-        if hasattr(self.sensor, "last_mode"):
-            self.sensor.last_mode = self._mode
-        if hasattr(self.sensor, "current_leds_mode"):
-            self.sensor.current_leds_mode = self._led_mode
-
-        # LineSensorI2C uses this cached flag when interpreting line polarity.
-        # Failure to refresh it must not break the UART service.
-        try:
-            self.sensor.check_line_type()
-        except Exception:
-            pass
-
     def dispatch(self, command, *arguments):
-        """Execute one bridge command without using the UART transport."""
-        self._service_state()
+        """Execute one server command without using the UART transport."""
         self._record_uart(command, arguments)
         handler = self._find_handler(command)
         if handler is None:
@@ -307,11 +244,10 @@ class LineSensorI2CuRemoteBridge:
         Returns ``True`` when a request was handled and ``False`` when no UART
         request was waiting.
         """
-        self._service_state()
-        if not self.remote._waiting():
+        if not self._waiting():
             return False
 
-        status, command, data = self.remote._recv_command()
+        status, command, data = self._recv_command()
         if status != STATUS_OK or not command:
             return False
 
@@ -321,7 +257,7 @@ class LineSensorI2CuRemoteBridge:
         self._record_uart(command, data)
         handler = self._find_handler(command)
         if handler is None:
-            self.remote._send_command(
+            self._send_command(
                 command,
                 command + "() function not found remotely",
                 status=STATUS_ERR,
@@ -331,7 +267,7 @@ class LineSensorI2CuRemoteBridge:
         try:
             response = handler(*data)
         except Exception as error:
-            self.remote._send_command(
+            self._send_command(
                 command,
                 command + ": " + str(error),
                 status=STATUS_ERR,
@@ -343,12 +279,11 @@ class LineSensorI2CuRemoteBridge:
         elif not isinstance(response, tuple):
             response = (response,)
 
-        self.remote._send_command(command, *response, status=STATUS_OK)
-        self._service_state()
+        self._send_command(command, *response, status=STATUS_OK)
         return True
 
     def run_forever(self, idle_ms=0):
-        """Run the bridge service loop forever."""
+        """Run the uRemote service loop forever."""
         idle_ms = max(0, int(idle_ms))
         while True:
             self.process()
@@ -374,29 +309,32 @@ class LineSensorI2CuRemoteBridge:
         return self._set_mode(self.MODE_CALIBRATED)
 
     def mode(self, new_mode=None):
-        self._service_state()
+        """Set sensor mode. Getting mode is not available over I2C."""
         if new_mode is None:
-            return self._mode
+            raise ValueError("mode get is not available over I2C")
         return self._set_mode(new_mode)
 
     def cur_mode(self):
-        self._service_state()
-        return self._mode
+        """Current mode is owned by firmware; I2C has no mode readback."""
+        raise ValueError("cur_mode is not available over I2C")
 
     def debug(self, *_ignored):
-        """Return the same six status values as firmware debug_status."""
-        self._service_state()
+        """Return status fields; mode and LED mode are unknown over I2C."""
+        try:
+            emitter = 1 if self.sensor.get_value(self.sensor.CONFIG_IR_POWER) else 0
+        except Exception:
+            emitter = 0
         return (
             ticks_ms(),
-            self._mode,
+            -1,  # Mode is firmware-owned; not readable over I2C.
             1 if self.sensor.is_calibrated() else 0,
-            self._emitter_state,
-            self._led_mode,
-            0,  # The bridge cannot read the firmware's I2C queue counter.
+            emitter,
+            -1,  # LED mode is not readable over I2C.
+            0,  # The server cannot read the firmware's I2C queue counter.
         )
 
     def last_commands(self):
-        """Return the latest bridged UART and I2C commands and parameters."""
+        """Return the latest UART and I2C commands and parameters."""
         return (
             self._last_uart_command,
             self._last_uart_parameters,
@@ -408,28 +346,9 @@ class LineSensorI2CuRemoteBridge:
 
     def calibrate(self, save=0):
         save = 1 if save else 0
-
-        if self._mode in (self.MODE_RAW, self.MODE_CALIBRATED):
-            self._previous_mode = self._mode
-        self._previous_led_mode = self._led_mode
-
-        self._record_i2c("get_conf_value", self.sensor.CONFIG_CAL_DURATION)
-        duration = int(self.sensor.get_value(self.sensor.CONFIG_CAL_DURATION))
-        if duration < 0:
-            duration = 0
-
-        # Current I2C firmware accepts the same optional save flag as the
-        # native uRemote firmware and performs the timed routine itself.
+        # Firmware owns the calibration timer and mode transitions.
         self._record_i2c("calibrate", save)
         self.sensor.write_command((self.sensor.CMD_CALIBRATE, save))
-
-        self._calibrating = True
-        self._mode = self.MODE_CALIBRATING
-        if hasattr(self.sensor, "current_mode"):
-            self.sensor.current_mode = self.MODE_CALIBRATING
-
-        delay = (duration * 1000) + self._calibration_grace_ms
-        self._calibration_deadline = ticks_add(ticks_ms(), delay)
         return 1
 
     def is_calibrated(self):
@@ -437,8 +356,6 @@ class LineSensorI2CuRemoteBridge:
         return 1 if self.sensor.is_calibrated() else 0
 
     def save_cal(self):
-        # Use the simple I2C command. LineSensorI2C.save_calibration() is a
-        # higher-level helper intended for its older blocking calibration flow.
         self._record_i2c("save_cal")
         self.sensor.write_command(self.sensor.CMD_SAVE_CAL)
         return 1
@@ -530,18 +447,16 @@ class LineSensorI2CuRemoteBridge:
         enabled = 1 if enabled else 0
         self._record_i2c("set_emitter", enabled)
         self.sensor.set_emitter(enabled)
-        self._emitter_state = enabled
         return 1
 
     def leds(self, new_mode=None):
         if new_mode is None:
-            return self._led_mode
+            raise ValueError("LED mode get is not available over I2C")
         new_mode = self._u8(new_mode, "LED mode")
         if new_mode > 3:
             raise ValueError("LED mode must be in range 0..3")
         self._record_i2c("leds", new_mode)
         self.sensor.leds(new_mode)
-        self._led_mode = new_mode
         return new_mode
 
     def neopixel(self, index, red, green, blue):

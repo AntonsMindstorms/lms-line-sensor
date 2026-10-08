@@ -170,6 +170,7 @@ class TestBaseLineSensorConstants:
         """Verify MODE_* constants are defined and match across base and concrete classes."""
         assert line_sensor.BaseLineSensor.MODE_RAW == 0
         assert line_sensor.BaseLineSensor.MODE_CALIBRATED == 1
+        assert line_sensor.BaseLineSensor.MODE_DIGITAL == 2
         assert line_sensor.BaseLineSensor.MODE_SAVING == 2
         assert line_sensor.BaseLineSensor.MODE_CALIBRATING == 3
 
@@ -179,8 +180,8 @@ class TestBaseLineSensorConstants:
             == line_sensor.BaseLineSensor.MODE_CALIBRATED
         )
         assert (
-            line_sensor.LineSensorI2C.MODE_SAVING
-            == line_sensor.BaseLineSensor.MODE_SAVING
+            line_sensor.LineSensorI2C.MODE_DIGITAL
+            == line_sensor.BaseLineSensor.MODE_DIGITAL
         )
         assert (
             line_sensor.LineSensorI2C.MODE_CALIBRATING
@@ -247,7 +248,6 @@ class TestLineSensorI2CDataProcessing:
         ), patch.object(line_sensor.LineSensorI2C, "check_line_type"):
             self.sensor = line_sensor.LineSensorI2C()
         self.sensor.i2c = MagicMock()
-        self.sensor.current_mode = self.sensor.MODE_CALIBRATED
         self.sensor.black_line = False
 
     def test_position_returns_scalar(self):
