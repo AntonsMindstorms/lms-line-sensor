@@ -273,7 +273,7 @@ function formatTrace(command, parameters, timestamp) {
   return `${command}(${parameters}) · ${Number(timestamp) / 1000}s`;
 }
 
-function renderStatus(status) {
+function renderStatus(status, blackLine) {
   const mode = Number(status[1]);
   const emitterOn = Boolean(status[3]);
   const ledMode = Number(status[4]);
@@ -286,8 +286,11 @@ function renderStatus(status) {
   $("statusMode").className = `status-value${mode === 3 ? " busy" : ""}`;
   $("statusLedMode").textContent = ledModeNames[ledMode] ?? `Mode ${ledMode}`;
   $("statusLedMode").className = `status-value${ledMode === 0 ? " off" : ""}`;
+  $("statusLineType").textContent = blackLine ? "Black" : "White";
+  $("statusLineType").className = "status-value";
 
   $("emitter").checked = emitterOn;
+  $("blackline").checked = blackLine;
   $("ledMode").value = String(ledMode);
   $("rawMode").classList.toggle("active", mode !== 1);
   $("calMode").classList.toggle("active", mode === 1);
@@ -296,8 +299,10 @@ function renderStatus(status) {
 }
 
 async function refreshStatus() {
-  const status = await remote.call("debug_status");
-  renderStatus(status);
+  const [status, lineType] = await Promise.all([
+    remote.call("debug_status"), remote.call("blackline")
+  ]);
+  renderStatus(status, Boolean(lineType[0]));
   lastStatusPollMs = performance.now();
   $("uptime").textContent = `${Math.floor(status[0] / 1000)} s`;
   $("overflows").textContent = status[5];
@@ -370,6 +375,10 @@ $("emitter").addEventListener("change", event => action(async () => {
   await remote.call("set_emitter", event.target.checked ? 1 : 0);
   await refreshStatus();
 }, `Emitter ${event.target.checked ? "on" : "off"}`));
+$("blackline").addEventListener("change", event => action(async () => {
+  await remote.call("blackline", event.target.checked);
+  await refreshStatus();
+}, `${event.target.checked ? "Black" : "White"} line selected`));
 
 $("loadConfig").addEventListener("click", () => action(refreshConfig, "Configuration refreshed"));
 $("saveConfig").addEventListener("click", () => action(async () => {

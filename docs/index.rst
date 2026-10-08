@@ -4,7 +4,7 @@ LMS Line Sensor
 Software and firmware for the eight-channel LMS reflectance line sensor
 (CH32V203). The board speaks I2C, UART uRemote, and USB CDC uRemote.
 
-**Current firmware version: 5.5**
+**Current firmware version: 5.6**
 
 Firmware, flashing, packet layout, EEPROM, LED modes, and the low-level command
 tables are maintained in the repository file ``firmware/README.md``. This page
@@ -15,7 +15,7 @@ Flash firmware
 
 1. Connect the line sensor to your PC with USB.
 2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
-3. Drag ``firmware/firmware_ch32_line_i2c_ur_v5.5.uf2`` onto that drive.
+3. Drag ``firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`` onto that drive.
 4. Wait for the drive to disappear. Unplug and replug USB if NeoPixels do not scan.
 
 Web dashboard
@@ -116,6 +116,11 @@ Works for a direct UART cable to the sensor, or for an LMS-ESP32 running
 Prefer these high-level names in new code: ``ir_power``, ``leds``,
 ``save_calibration``, ``load_calibration``. Compatibility aliases such as
 ``set_emitter`` and ``led_mode`` remain available.
+
+Line polarity: firmware 5.6 defaults to a black line on a light surface. Call
+``sensor.blackline(False)`` for a white line, then recalibrate. The setting is
+not stored in EEPROM, so call it again after power-up. ``blackline()`` without
+an argument returns the current setting on ``LineSensorUR``.
 
 Useful constants:
 

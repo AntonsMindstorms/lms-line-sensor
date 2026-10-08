@@ -4,7 +4,7 @@ Browser console for the LMS Line Sensor over USB (Web Serial + uRemote).
 
 ## Hosted
 
-1. Flash firmware **5.5** if needed (`firmware/`).
+1. Flash firmware **5.6** if needed (`firmware/`).
 2. Plug the sensor into USB.
 3. Open [https://linesensor.antonsmindstorms.com](https://linesensor.antonsmindstorms.com) in **Chrome** or **Edge**.
 4. Choose **Connect USB** → **Line Sensor uRemote**.

@@ -13,12 +13,12 @@
       document.documentElement.dataset.theme = "light";
     }
   </script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=5.6">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="logo.svg" width="52" height="52" alt="">
+      <img class="brand-logo" src="lms-line-sensor.png" width="52" height="52" alt="">
       <div>
         <p class="eyebrow">uRemote · USB</p>
         <h1>Line Sensor Console</h1>
@@ -42,12 +42,21 @@
         <button id="rawMode" class="active">Raw</button>
         <button id="calMode">Calibrated</button>
       </div>
-      <div class="toggle-row">
-        <span>IR emitter</span>
-        <label class="switch">
-          <input id="emitter" type="checkbox">
-          <span></span>
-        </label>
+      <div class="toggle-group">
+        <div class="toggle-row">
+          <span>IR emitter</span>
+          <label class="switch">
+            <input id="emitter" type="checkbox">
+            <span></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Black line</span>
+          <label class="switch">
+            <input id="blackline" type="checkbox">
+            <span></span>
+          </label>
+        </div>
       </div>
     </section>
 
@@ -63,6 +72,10 @@
       <div class="status-item">
         <span class="label">LED mode</span>
         <strong id="statusLedMode" class="status-value">—</strong>
+      </div>
+      <div class="status-item">
+        <span class="label">Line type</span>
+        <strong id="statusLineType" class="status-value">—</strong>
       </div>
     </section>
 
@@ -161,6 +174,6 @@
   </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=5.6"></script>
 </body>
 </html>

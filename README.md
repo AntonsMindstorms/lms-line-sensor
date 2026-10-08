@@ -7,9 +7,9 @@ Drivers, firmware, and tools for the [LMS Line Sensor](https://www.antonsmindsto
 
 </div>
 
-## 1. Flash the sensor (firmware 5.5)
+## 1. Flash the sensor (firmware 5.6)
 
-Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.5.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.5.uf2)
+Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.6.uf2)
 
 1. Connect the line sensor to your PC with USB.
 2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
@@ -148,7 +148,9 @@ SHAPE_Y        = 'Y'
 
 Aliases kept for compatibility (same behavior): `set_emitter` → `ir_power`, `rgb_mode` / `led_mode` → `leds`, `get_cal_min` / `get_cal_max` → `get_min` / `get_max`, and similar `set_cal_*` / `set_neopixel` forms.
 
-`LineSensorI2C` also has `check_line_type()`, `start_calibration()`, and fine-grained calibration helpers.
+`LineSensorI2C` also has `start_calibration()` and fine-grained calibration helpers.
+
+Line polarity: firmware 5.6 defaults to a black line. Use `blackline(False)` for a white line (then recalibrate); the setting is not stored in EEPROM. Both classes provide it, and `LineSensorUR.blackline()` without an argument reads the current value.
 
 `LineSensorURServer` (LMS-ESP32) subclasses frozen `uRemote` and exposes the native uRemote command names over UART while talking to the sensor on I2C.
 
@@ -156,6 +158,7 @@ Aliases kept for compatibility (same behavior): `set_emitter` → `ir_power`, `r
 
 - [`examples/spike-direct/`](examples/spike-direct/) — SPIKE hub, direct UART
 - [`examples/lms-esp32-ur-server/`](examples/lms-esp32-ur-server/) — hub + LMS-ESP32 + I2C sensor
+- [`examples/spike-pup-test/`](examples/spike-pup-test/) — SPIKE + LMS-ESP32 + I2C line sensor over PUPRemote
 - [`examples/spike-robocup/`](examples/spike-robocup/) — SPIKE + LMS-ESP32 with PUPRemote
 - [`examples/ev3-robocup/`](examples/ev3-robocup/) — EV3 + LMS-ESP32
 - [`examples/pybricks_smoke_test.py`](examples/pybricks_smoke_test.py) — quick UART bring-up
