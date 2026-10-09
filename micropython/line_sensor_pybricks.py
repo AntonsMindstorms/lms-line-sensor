@@ -467,6 +467,9 @@ class LineSensorUR(BaseLineSensor):
         self._require_sensor_count(values, 'set_cal_max')
         return self.ur.call('set_cal_max', *values)
 
+    def set_conf_value(self, index, value):
+        return self.ur.call('set_conf_value', index, value)
+
     def get_config(self):
         return self._bytes_tuple(self.ur.call('get_config'))
 

@@ -639,7 +639,7 @@ class LineSensorUR(BaseLineSensor):
         return self.ur.call("get_conf_value", index)
 
     def set_conf_value(self, index, value):
-        """[pybricks:omit] Write one config byte by index and save config."""
+        """Write one config byte by index and save config."""
         return self.ur.call("set_conf_value", index, value)
 
     def get_config(self):
