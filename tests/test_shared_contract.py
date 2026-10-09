@@ -72,3 +72,36 @@ def test_documented_calibrate_signature():
     """README: ``calibrate(duration=5)``; UR defaults to the sensor's own setting."""
     assert inspect.signature(LineSensorI2C.calibrate).parameters["duration"].default == 5
     assert inspect.signature(LineSensorUR.calibrate).parameters["duration"].default is None
+
+
+# README, "API overview": which compatibility aliases exist where.
+ALIASES_ON_BOTH = {
+    "set_emitter": "ir_power",
+    "get_cal_min": None,
+    "get_cal_max": None,
+    "set_cal_min": None,
+    "set_cal_max": None,
+}
+ALIASES_ON_I2C_ONLY = {
+    "rgb_mode": "leds",
+    "led_mode": "leds",
+    "set_neopixel": "neopixel",
+    "get_min": "get_cal_min",
+    "get_max": "get_cal_max",
+    "set_min": "set_cal_min",
+    "set_max": "set_cal_max",
+}
+
+
+@pytest.mark.parametrize("alias", ALIASES_ON_BOTH)
+@pytest.mark.parametrize("backend", [LineSensorI2C, LineSensorUR])
+def test_documented_shared_aliases(backend, alias):
+    assert callable(getattr(backend, alias))
+
+
+@pytest.mark.parametrize("alias", ALIASES_ON_I2C_ONLY)
+def test_documented_i2c_only_aliases(alias):
+    assert callable(getattr(LineSensorI2C, alias))
+    assert not hasattr(LineSensorUR, alias), (
+        "%s now exists on LineSensorUR: update the README alias list" % alias
+    )

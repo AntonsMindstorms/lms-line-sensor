@@ -146,7 +146,7 @@ SHAPE_Y        = 'Y'
 | `leds(mode)` | Automatic NeoPixel mode |
 | `save_calibration()` / `load_calibration()` | EEPROM calibration |
 
-Aliases kept for compatibility (same behavior): `set_emitter` → `ir_power`, `rgb_mode` / `led_mode` → `leds`, `get_cal_min` / `get_cal_max` → `get_min` / `get_max`, and similar `set_cal_*` / `set_neopixel` forms.
+Compatibility aliases available on both classes: `set_emitter` (= `ir_power`) and `get_cal_min` / `get_cal_max` / `set_cal_min` / `set_cal_max`. `LineSensorI2C` also accepts `rgb_mode` / `led_mode` (= `leds`), `set_neopixel` (= `neopixel`) and `get_min` / `get_max` / `set_min` / `set_max`.
 
 `LineSensorI2C` also has `start_calibration()` and fine-grained calibration helpers.
 
