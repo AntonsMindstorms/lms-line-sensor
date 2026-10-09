@@ -20,7 +20,8 @@ def _read(path):
     return path.read_text(encoding="utf-8").strip()
 
 
-def main():
+def build_bundle():
+    """Return the generated Pybricks driver source as a string."""
     line_sensor_src = _read(LINE_SENSOR_FILE)
     base_src = (
         '"""Shared API and constants for LMS line sensor drivers."""\n\n\n'
@@ -44,7 +45,11 @@ def main():
             strip_docstrings=True,
         ),
     ]
-    OUTPUT_FILE.write_text("\n\n".join(parts) + "\n", encoding="utf-8")
+    return "\n\n".join(parts) + "\n"
+
+
+def main():
+    OUTPUT_FILE.write_text(build_bundle(), encoding="utf-8")
 
 
 if __name__ == "__main__":
