@@ -324,6 +324,7 @@ class LineSensorI2C(BaseLineSensor):
     def leds(self, mode):
         """Select the automatic NeoPixel display mode."""
         self.write_command((self.CMD_LEDS, mode))
+
     def load_calibration(self):
         """Load calibration minima and maxima from sensor EEPROM."""
         self.write_command(self.CMD_LOAD_CAL)
