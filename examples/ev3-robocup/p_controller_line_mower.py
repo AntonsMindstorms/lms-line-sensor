@@ -20,7 +20,7 @@ ls.mode_calibrated()
 while True:
     pos, shape = ls.data(ls.POSITION, ls.SHAPE)
     
-    if shape is " ": # Stop on white
+    if shape == " ": # Stop on white
         left_dc = right_dc = 0
     else:
         steer = pos*KP
