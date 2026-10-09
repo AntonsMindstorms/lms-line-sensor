@@ -1,5 +1,6 @@
 """Generate the standalone Pybricks upload file."""
 
+import re
 from pathlib import Path
 
 from pybricks_bundle_ast import (
@@ -28,6 +29,9 @@ def build_bundle():
         + extract_class_module(line_sensor_src, "BaseLineSensor")
     )
     ur_src = extract_ur_module(line_sensor_src)
+    version = re.search(r'^__version__ = (["\'].*["\'])$', line_sensor_src, re.MULTILINE)
+    if version is None:
+        raise ValueError("__version__ not found in line_sensor.py")
 
     parts = [
         '"""Generated standalone Pybricks driver for the LMS line sensor.\n\n'
@@ -35,6 +39,7 @@ def build_bundle():
         "`python tools/generate_line_sensor_pybricks.py`\n"
         '"""',
         "__all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']",
+        "__version__ = " + version.group(1),
         transform_module(
             base_src, slim_base=True, omit_tagged_methods=True, strip_docstrings=True
         ),

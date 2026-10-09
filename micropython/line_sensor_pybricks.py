@@ -6,6 +6,8 @@ Do not edit by hand. Regenerate with:
 
 __all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']
 
+__version__ = "0.3.2"
+
 """Shared API and constants for LMS line sensor drivers."""
 
 class BaseLineSensor:
