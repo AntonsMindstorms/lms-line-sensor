@@ -179,4 +179,5 @@ sphinx-build -b html docs docs/_build/html
 - Pybricks bundle: `tools/generate_line_sensor_pybricks.py` → `micropython/line_sensor_pybricks.py`
 - LMS-ESP32 uRemote server: `micropython/line_sensor_ur_server.py`
 - Sphinx mocks the MicroPython `machine` module for desktop builds
+- Tests need no hardware: `python -m pip install pytest && python -m pytest` (see [`tests/README.md`](tests/README.md))
 - PyPI publish: bump version in `micropython/line_sensor.py` and `package.json`, then `rm -rf ./dist && python -m build && twine upload dist/*`
