@@ -22,6 +22,7 @@ classifiers = [
 
 [project.optional-dependencies]
 docs = ["sphinx>=7,<9"]
+test = ["pytest>=7"]
 
 [tool.setuptools]
 packages = ["line_sensor", "vendor"]
@@ -32,3 +33,7 @@ version = { attr = "line_sensor.__version__" }
 
 [tool.setuptools.package-dir]
 "" = "micropython"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
