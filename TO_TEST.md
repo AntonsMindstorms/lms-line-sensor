@@ -74,6 +74,11 @@ UART does not.
       replies.
 - [ ] `await sensor.calibrate()` works inside `run_task()` (it reads the
       calibration time from the sensor on first use).
+- [ ] `examples/ev3-robocup/p_controller_line_mower_async.py` on the EV3: it
+      follows the line while the face animates, the eyes look the right way,
+      the face stays animated during calibration (center button), and the
+      motors stop when the program is interrupted. Check the animation does not
+      slow the steering noticeably compared with `p_controller_line_mower.py`.
 - [ ] The bundle size is acceptable on the hub (it now contains the async
       uRemote client): upload time and start-up time.
 
