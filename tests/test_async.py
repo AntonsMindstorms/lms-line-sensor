@@ -159,17 +159,9 @@ class TestPlainDriverStaysPlain:
 @pytest.fixture
 def run_task_mode(monkeypatch, bench):
     """Make the Pybricks bundle behave as if inside ``run_task()``."""
-
-    async def wait(milliseconds):
-        bench.clock.sleep_ms(milliseconds)
-        await asyncio.sleep(0)
-
-    monkeypatch.setattr(bundle, "run_task", lambda: True)
-    monkeypatch.setattr(bundle, "wait", wait)
-    monkeypatch.setattr(
-        bundle, "UARTDevice", lambda port, timeout=1000, power_pin=None: fakes.AsyncUARTView(bench.endpoint("portB"))
+    fakes.install_run_task(
+        monkeypatch, bench, bundle, [bundle, line_sensor], always=True
     )
-    monkeypatch.setattr(line_sensor, "wait", wait)
     return bench
 
 

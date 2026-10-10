@@ -15,6 +15,7 @@ Nothing here talks to real hardware. The pieces mirror the real stack:
 """
 
 import types
+from types import SimpleNamespace
 
 SENSOR_ADDRESS = 0x33
 
@@ -124,20 +125,80 @@ class FakeUART:
         return data
 
 
-class AsyncUARTView:
-    """Pybricks ``UARTDevice`` as seen under ``run_task()``: read/write are awaitable."""
+class AdaptiveUART:
+    """Pybricks ``UARTDevice``: blocking normally, awaitable inside ``run_task()``."""
 
-    def __init__(self, uart):
+    def __init__(self, uart, inside):
         self._uart = uart
+        self._inside = inside
         self.set_baudrate = uart.set_baudrate
         self.read_all = uart.read_all
         self.waiting = uart.waiting
 
-    async def read(self, count=1):
-        return self._uart.read(count)
+    @staticmethod
+    async def _ready(value):
+        return value
 
-    async def write(self, data):
-        return self._uart.write(data)
+    def read(self, count=1):
+        data = self._uart.read(count)
+        return self._ready(data) if self._inside() else data
+
+    def write(self, data):
+        written = self._uart.write(data)
+        return self._ready(written) if self._inside() else written
+
+
+class StopProgram(Exception):
+    """Raised by the fake ``wait`` to end a program that loops forever."""
+
+
+def install_run_task(monkeypatch, bench, bundle, modules, limit_ms=None, always=False):
+    """Make the Pybricks bundle behave as if running under ``run_task()``.
+
+    ``always``    treat every call as inside run_task() (even the constructor);
+                  otherwise it is only inside while ``run_task(awaitable)`` runs.
+    ``limit_ms``  raise StopProgram from ``wait`` once the fake clock passes it.
+    ``modules``   modules whose ``wait`` / ``run_task`` names are replaced.
+    """
+    import asyncio
+
+    state = {"inside": always}
+
+    async def wait(milliseconds):
+        # Advance the clock one millisecond at a time and let the other tasks
+        # run in between, so that concurrent waits genuinely interleave. (All
+        # waiting tasks share one clock, so it runs faster with more tasks.)
+        for _ in range(max(1, int(milliseconds))):
+            bench.clock.sleep_ms(1 if milliseconds else 0)
+            if limit_ms is not None and bench.clock.now >= limit_ms:
+                raise StopProgram
+            await asyncio.sleep(0)
+
+    def run_task(awaitable=None):
+        if awaitable is None:
+            return state["inside"]
+
+        async def runner():
+            return await awaitable
+
+        state["inside"] = True
+        try:
+            return asyncio.run(runner())
+        finally:
+            state["inside"] = always
+
+    for module in modules:
+        for name, value in (("wait", wait), ("run_task", run_task)):
+            if hasattr(module, name):
+                monkeypatch.setattr(module, name, value)
+    monkeypatch.setattr(
+        bundle,
+        "UARTDevice",
+        lambda port, timeout=1000, power_pin=None: AdaptiveUART(
+            bench.endpoint("port%s" % port), run_task
+        ),
+    )
+    return SimpleNamespace(wait=wait, run_task=run_task)
 
 
 class FakeLineSensor:
@@ -397,6 +458,10 @@ def build_pybricks_modules():
         D = "D"
         E = "E"
         F = "F"
+        S1 = "S1"
+        S2 = "S2"
+        S3 = "S3"
+        S4 = "S4"
 
     parameters.Port = Port
 
