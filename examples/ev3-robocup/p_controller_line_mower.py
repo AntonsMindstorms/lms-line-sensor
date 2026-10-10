@@ -11,15 +11,33 @@ mc=Motor(Port.C, Direction.COUNTERCLOCKWISE)
 ls = LineSensor(Port.S1)
 
 KP = 0.8
-BASE_DC = 60 # DC=Direct Current. Or % of max power routed to the motor.
+BASE_DC = 30 # DC=Direct Current. Or % of max power routed to the motor.
 
-ls.load_calibration()
+def show_instructions():
+    hub.screen.clear()
+    hub.screen.draw_text(0,10,'Press middle button to\nstart calibration.')
+
+def calibrate():
+    hub.screen.clear()
+    hub.screen.draw_text(0,25,'Calibrating...\n\nMove sensor over line\nuntil blue light stops\nblinking.')
+    ls.calibrate()
+    show_instructions()
+    
+try:
+    ls.load_calibration()
+except:
+    # Firmware 5.6 balks if you load_calibration without calibrating first.
+    calibrate()
+
+show_instructions()
 ls.ir_power(True)
 ls.mode_calibrated()
 
 while True:
     pos, shape = ls.data(ls.POSITION, ls.SHAPE)
     
+    if Button.CENTER in hub.buttons.pressed():
+        calibrate()
     if shape == " ": # Stop on white
         left_dc = right_dc = 0
     else:
