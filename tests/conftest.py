@@ -12,10 +12,6 @@ from pathlib import Path
 
 import pytest
 
-# The uRemote submodule tracks .pyc files upstream; importing it must not
-# rewrite them and leave the submodule showing as modified.
-sys.dont_write_bytecode = True
-
 import fakes
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
