@@ -482,8 +482,12 @@ class LineSensorURServer(uRemote):
             )
         return bytes(raw)
 
-    def blackline(self):
-        return 1 if getattr(self.sensor, "black_line", False) else 0
+    def blackline(self, black=None):
+        """Get the last written line polarity, or set it when an argument is given."""
+        if black is None:
+            return 1 if self.sensor.black_line else 0
+        self._record_i2c("blackline", 1 if black else 0)
+        return 1 if self.sensor.blackline(black) else 0
 
     @staticmethod
     def print_value(value):

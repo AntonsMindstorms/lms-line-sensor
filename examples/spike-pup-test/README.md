@@ -1,41 +1,34 @@
-\# Simple Line test
+# Simple line test
 
+A SPIKE Prime hub reads line position, derivative and shape from an LMS-ESP32
+that talks to the line sensor over I2C, using PUPRemote between hub and ESP32.
 
+## Setup
 
-\## setup
+* Connect the line sensor module to the LMS-ESP32 with the Qwiic cable.
+* Connect the LMS-ESP32 to the SPIKE Prime hub on port A.
 
-* Connect line sensor module using i2c to LMS-ESP32 using the QWIIC cable
-* connect LMS-ESP32 to Spike prime on Port A
+## Load the programs
 
+### LMS-ESP32
 
+1. Open <https://viper-ide.org/> and connect to the LMS-ESP32.
+2. Create a new program `line_sensor.py` and paste the contents of
+   [`micropython/line_sensor.py`](../../micropython/line_sensor.py). Save it.
+3. Create a new program `main.py` and paste the contents of
+   [`line_esp32_main.py`](line_esp32_main.py). Save it.
 
-\## Load programs
+### Pybricks
 
-\### LMS-ESP32
+1. Open <https://code.pybricks.com>.
+2. Create a new program named `line_sensor_pybricks.py` and paste the contents of
+   [`micropython/line_sensor_pybricks.py`](../../micropython/line_sensor_pybricks.py).
+3. Create a new program named `line_pybricks` and paste the contents of
+   [`line_pybricks.py`](line_pybricks.py).
 
-* start https://viper-ide.org/
-* connect to lms-esp32
-* create new program: `line\_sensor.py` 
-* paste program from `Micropython/line\_sensor.py` and save
-* create new program `main.py`.
-* paste content of `examples/spike-pup-test/line\_esp32\_main.py` and save
+## Running
 
-
-
-\### Pybricks
-
-* open `code.pybricks.com`
-* create new program, name it `line\_sensor\_pybricks.py`
-* paste content of `Micropython/line\_sensor\_pybricks.py`
-* create new program, name it `line\_pybricks`
-* paste prigram from `examples/spike-pup-test/line\_pybricks.py`
-
-
-
-\## Running
-
-* reset LMS-ESP32, so that `main.py` starts
-* run `line\_pybricks.py` on Pybricks
-* A count down counter is shown on the prime display.
-* Press left button to calibrate the line sensor.
-
+1. Reset the LMS-ESP32 so that `main.py` starts.
+2. Run `line_pybricks.py` on the hub.
+3. A countdown is shown on the hub display.
+4. Press the left button to calibrate the line sensor.

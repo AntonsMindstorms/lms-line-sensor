@@ -160,9 +160,11 @@ SHAPE_Y        = 'Y'
 | `leds(mode)` | Automatic NeoPixel mode |
 | `save_calibration()` / `load_calibration()` | EEPROM calibration |
 
-Aliases kept for compatibility (same behavior): `set_emitter` → `ir_power`, `rgb_mode` / `led_mode` → `leds`, `get_cal_min` / `get_cal_max` → `get_min` / `get_max`, and similar `set_cal_*` / `set_neopixel` forms.
+Compatibility aliases available on both classes: `set_emitter` (= `ir_power`) and `get_cal_min` / `get_cal_max` / `set_cal_min` / `set_cal_max`. `LineSensorI2C` also accepts `rgb_mode` / `led_mode` (= `leds`), `set_neopixel` (= `neopixel`) and `get_min` / `get_max` / `set_min` / `set_max`.
 
-`LineSensorI2C` also has `check_line_type()`, `start_calibration()`, and fine-grained calibration helpers.
+`LineSensorI2C` also has `start_calibration()` and fine-grained calibration helpers.
+
+Line polarity: firmware 5.6 defaults to a black line. Use `blackline(False)` for a white line (then recalibrate); the setting is not stored in EEPROM. Both classes provide it, and `LineSensorUR.blackline()` without an argument reads the current value.
 
 `LineSensorURServer` (LMS-ESP32) subclasses frozen `uRemote` and exposes the native uRemote command names over UART while talking to the sensor on I2C.
 
@@ -170,6 +172,7 @@ Aliases kept for compatibility (same behavior): `set_emitter` → `ir_power`, `r
 
 - [`examples/spike-direct/`](examples/spike-direct/) — SPIKE hub, direct UART
 - [`examples/lms-esp32-ur-server/`](examples/lms-esp32-ur-server/) — hub + LMS-ESP32 + I2C sensor
+- [`examples/spike-pup-test/`](examples/spike-pup-test/) — SPIKE + LMS-ESP32 + I2C line sensor over PUPRemote
 - [`examples/spike-robocup/`](examples/spike-robocup/) — SPIKE + LMS-ESP32 with PUPRemote
 - [`examples/ev3-robocup/`](examples/ev3-robocup/) — EV3 + LMS-ESP32
 - [`examples/pybricks_smoke_test.py`](examples/pybricks_smoke_test.py) — quick UART bring-up
@@ -193,4 +196,5 @@ sphinx-build -b html docs docs/_build/html
   existing checkout. The bundle generator trims the Pybricks client from it.
 - LMS-ESP32 uRemote server: `micropython/line_sensor_ur_server.py`
 - Sphinx mocks the MicroPython `machine` module for desktop builds
+- Tests need no hardware: `python -m pip install pytest && python -m pytest` (see [`tests/README.md`](tests/README.md))
 - PyPI publish: bump version in `micropython/line_sensor.py` and `package.json`, then `rm -rf ./dist && python -m build && twine upload dist/*`

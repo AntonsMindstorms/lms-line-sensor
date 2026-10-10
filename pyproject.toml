@@ -22,6 +22,7 @@ classifiers = [
 
 [project.optional-dependencies]
 docs = ["sphinx>=7,<9"]
+test = ["pytest>=7"]
 
 [tool.setuptools]
 packages = ["line_sensor", "vendor"]
@@ -32,3 +33,14 @@ version = { attr = "line_sensor.__version__" }
 
 [tool.setuptools.package-dir]
 "" = "micropython"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+    # Inside run_task() the constructor deliberately drops its pending config
+    # read; the first awaited get_config() performs it (see LineSensorUR).
+    "ignore:coroutine 'BaseLineSensor._finish_async' was never awaited:RuntimeWarning",
+    "ignore:coroutine 'uRemote._drive_async' was never awaited:RuntimeWarning",
+    "ignore:coroutine 'AsyncRemote.call.<locals>.reply' was never awaited:RuntimeWarning",
+]

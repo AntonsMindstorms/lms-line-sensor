@@ -114,8 +114,15 @@ Works for a direct UART cable to the sensor, or for an LMS-ESP32 running
        wait(100)
 
 Prefer these high-level names in new code: ``ir_power``, ``leds``,
-``save_calibration``, ``load_calibration``. Compatibility aliases such as
-``set_emitter`` and ``led_mode`` remain available.
+``save_calibration``, ``load_calibration``. Compatibility aliases
+``set_emitter`` and ``get_cal_min``/``get_cal_max``/``set_cal_min``/``set_cal_max``
+exist on both classes; ``LineSensorI2C`` also accepts ``led_mode``,
+``rgb_mode`` and ``set_neopixel``.
+
+Line polarity: firmware 5.6 defaults to a black line on a light surface. Call
+``sensor.blackline(False)`` for a white line, then recalibrate. The setting is
+not stored in EEPROM, so call it again after power-up. ``blackline()`` without
+an argument returns the current setting on ``LineSensorUR``.
 
 Useful constants:
 

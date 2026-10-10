@@ -1,5 +1,6 @@
 """Generate the standalone Pybricks upload file."""
 
+import re
 from pathlib import Path
 
 from pybricks_bundle_ast import (
@@ -21,13 +22,17 @@ def _read(path):
     return path.read_text(encoding="utf-8").strip()
 
 
-def main():
+def build_bundle():
+    """Return the generated Pybricks driver source as a string."""
     line_sensor_src = _read(LINE_SENSOR_FILE)
     base_src = (
         '"""Shared API and constants for LMS line sensor drivers."""\n\n\n'
         + extract_class_module(line_sensor_src, "BaseLineSensor")
     )
     ur_src = extract_ur_module(line_sensor_src)
+    version = re.search(r'^__version__ = (["\'].*["\'])$', line_sensor_src, re.MULTILINE)
+    if version is None:
+        raise ValueError("__version__ not found in line_sensor.py")
 
     parts = [
         '"""Generated standalone Pybricks driver for the LMS line sensor.\n\n'
@@ -35,6 +40,7 @@ def main():
         "`python tools/generate_line_sensor_pybricks.py`\n"
         '"""',
         "__all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']",
+        "__version__ = " + version.group(1),
         transform_module(
             base_src, slim_base=True, omit_tagged_methods=True, strip_docstrings=True
         ),
@@ -45,7 +51,11 @@ def main():
             strip_docstrings=True,
         ),
     ]
-    OUTPUT_FILE.write_text("\n\n".join(parts) + "\n", encoding="utf-8")
+    return "\n\n".join(parts) + "\n"
+
+
+def main():
+    OUTPUT_FILE.write_text(build_bundle(), encoding="utf-8")
 
 
 if __name__ == "__main__":

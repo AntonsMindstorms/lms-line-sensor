@@ -6,6 +6,8 @@ Do not edit by hand. Regenerate with:
 
 __all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']
 
+__version__ = "0.3.2"
+
 """Shared API and constants for LMS line sensor drivers."""
 
 class BaseLineSensor:
@@ -425,6 +427,9 @@ class LineSensorUR(BaseLineSensor):
     def set_cal_max(self, values):
         self._require_sensor_count(values, 'set_cal_max')
         return self.ur.call('set_cal_max', *values)
+
+    def set_conf_value(self, index, value):
+        return self.ur.call('set_conf_value', index, value)
 
     def get_config(self):
         return self._then(self._call_bytes('get_config'), self._remember_config)

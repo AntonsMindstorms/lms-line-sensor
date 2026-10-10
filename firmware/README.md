@@ -271,9 +271,9 @@ For example, select white-line polarity over uRemote with
 `sensor.call("blackline", False)`. Calling `blackline` without an argument
 returns the current boolean state.
 
-For a comparison with the command names used by the external LMS line-sensor
-MicroPython driver, see
-[`../UREMOTE_COMMAND_COMPARISON.md`](../UREMOTE_COMMAND_COMPARISON.md).
+The Python driver `LineSensorUR` maps its methods to these command names; see
+[`../docs/API/lms-line-sensor-uremote-api.rst`](../docs/API/lms-line-sensor-uremote-api.rst)
+for the full API reference.
 
 ## Python USB client
 
@@ -307,7 +307,7 @@ with URemote(select_serial_port()) as sensor:
 
 ## USB web dashboard
 
-The [`web`](web/) directory contains a dependency-free HTML, CSS, and JavaScript
+The [`web`](../web/) directory contains a dependency-free HTML, CSS, and JavaScript
 dashboard. It implements uRemote directly over the browser Web Serial API.
 
 The dashboard provides:
