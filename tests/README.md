@@ -35,6 +35,7 @@ Every test gets a fresh `bench`. The `device` fixture is its simulated sensor.
 | `test_bundle_tool.py`, `test_pybricks_bundle.py` | The Pybricks bundle generator and its output |
 | `test_ur_server.py` | `LineSensorURServer` commands, validation and wire handling |
 | `test_end_to_end.py` | Hub driver → UART → server → I2C → simulated sensor |
+| `test_examples.py` | The async EV3 line follower run end to end on a simulated EV3 (screen, buttons, motors) |
 | `test_read_line_sensor.py` | The desktop `usb/read_line_sensor.py` script |
 | `test_repository.py` | Firmware version, Markdown links, compile warnings, example imports |
 
