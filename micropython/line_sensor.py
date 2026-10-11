@@ -4,8 +4,8 @@ Single upload file for pyboards and local tests. Three sections:
 
   BaseLineSensor  — shared constants and high-level API
   LineSensorI2C   — I2C backend (LMS-ESP32 on pyboard)
-  LineSensorUR    — uRemote/UART backend (needs separate uremote.py on pyboard;
-                    included in the Pybricks bundle instead)
+  LineSensorUR    — uRemote/UART backend (needs separate uremote.py on boards
+                    without a frozen copy; included in the Pybricks bundle instead)
 
 Regenerate the Pybricks bundle after edits:
 
@@ -28,7 +28,8 @@ class BaseLineSensor:
 
     MODE_RAW = 0
     MODE_CALIBRATED = 1
-    MODE_SAVING = 2
+    MODE_DIGITAL = 2  # Reserved compatibility mode in firmware
+    MODE_SAVING = 2  # Obsolete driver alias for MODE_DIGITAL
     MODE_CALIBRATING = 3
 
     POSITION = 8
@@ -231,7 +232,7 @@ class LineSensorI2C(BaseLineSensor):
         """
         try:
             from machine import I2C, Pin
-            from time import sleep, ticks_ms, ticks_diff
+            from time import sleep
         except ImportError:
             raise RuntimeError(
                 "LineSensorI2C requires machine and time modules. "
@@ -240,16 +241,10 @@ class LineSensorI2C(BaseLineSensor):
 
         self.device_addr = device_addr
         self.i2c = I2C(i2c_id, scl=Pin(scl_pin), sda=Pin(sda_pin), freq=freq)
-        self.current_leds_mode = self.LEDS_OFF
-        self.save_start_time = 0
-        self.current_mode = self.MODE_CALIBRATED if mode is None else mode
-        self.last_mode = self.current_mode
         # Firmware 5.6 defaults to black-line polarity. Keep the last value
         # written because the I2C command is write-only.
         self.black_line = True
         self.sleep = sleep
-        self.ticks_ms = ticks_ms
-        self.ticks_diff = ticks_diff
 
         # Preserve the previous "ready after init" behavior.
         self.load_calibration()
@@ -274,17 +269,8 @@ class LineSensorI2C(BaseLineSensor):
         return self._retry(lambda: self.i2c.readfrom(device_addr, raw_bytes))
 
     def _read_all(self):
-        """Read the complete sensor packet or handle a pending save delay."""
-        if self.current_mode < self.MODE_SAVING:
-            return list(self.robust_i2c_readfrom(self.device_addr, self.RAW_BYTES))
-
-        if self.current_mode == self.MODE_SAVING:
-            if self.ticks_diff(self.ticks_ms(), self.save_start_time + 1500) > 0:
-                self.write_command(self.last_mode)
-                self.current_mode = self.last_mode
-                print("Calibration stored in EEPROM")
-
-        return [0] * self.RAW_BYTES
+        """Read the complete 13-byte measurement packet."""
+        return list(self.robust_i2c_readfrom(self.device_addr, self.RAW_BYTES))
 
     def data(self, *indices):
         """Read sensor data and optionally return only selected packet fields."""
@@ -301,31 +287,19 @@ class LineSensorI2C(BaseLineSensor):
 
     def mode_raw(self):
         """Select raw, uncalibrated sensor values."""
-        self.current_mode = self.last_mode = self.MODE_RAW
         self.write_command(self.MODE_RAW)
 
     def mode_calibrated(self):
         """Select normalized values based on the active calibration limits."""
-        self.current_mode = self.last_mode = self.MODE_CALIBRATED
         self.write_command(self.MODE_CALIBRATED)
 
-    def start_calibration(self):
-        """Start collecting calibration minima and maxima with LEDs off."""
-        print("Starting calibration")
-        self.last_mode = self.current_mode
-        self.current_mode = self.MODE_CALIBRATING
-        self.write_command((self.CMD_LEDS, self.LEDS_OFF))
-        self.write_command(self.CMD_CALIBRATE)
+    def start_calibration(self, save=False):
+        """Start firmware calibration. Pass save=True to store limits when done."""
+        self.write_command((self.CMD_CALIBRATE, 1 if save else 0))
 
     def save_calibration(self):
-        """Stop calibration, save its limits, and restore the previous modes."""
-        print("Stopping calibration and saving new values")
-        self.write_command(self.MODE_CALIBRATED)
-        self.write_command((self.CMD_LEDS, self.current_leds_mode))
-        self.write_command(self.last_mode)
+        """Save calibration minima and maxima to sensor EEPROM."""
         self.write_command(self.CMD_SAVE_CAL)
-        self.save_start_time = self.ticks_ms()
-        self.current_mode = self.MODE_SAVING
 
     def blackline(self, black):
         """Set firmware polarity: true for a black line, false for a white line."""
@@ -334,13 +308,10 @@ class LineSensorI2C(BaseLineSensor):
         return self.black_line
 
     def calibrate(self, duration=5):
-        """Run calibration for a duration in seconds and save the result."""
-        self.start_calibration()
-        self.sleep(duration)
-        self.save_calibration()
-        self.sleep(1.5)
-        print("Calibration stored in EEPROM")
-        self.current_mode = self.last_mode
+        """Run firmware calibration for ``duration`` seconds and save the result."""
+        self.set_cal_duration(int(duration))
+        self.start_calibration(save=True)
+        self.sleep(duration + 1)
 
     def ir_power(self, power):
         """Turn the IR emitter on or off."""
@@ -352,7 +323,6 @@ class LineSensorI2C(BaseLineSensor):
 
     def leds(self, mode):
         """Select the automatic NeoPixel display mode."""
-        self.current_leds_mode = mode
         self.write_command((self.CMD_LEDS, mode))
 
     def load_calibration(self):
@@ -670,7 +640,7 @@ class LineSensorUR(BaseLineSensor):
         return self.ur.call("get_conf_value", index)
 
     def set_conf_value(self, index, value):
-        """[pybricks:omit] Write one config byte by index and save config."""
+        """Write one config byte by index and save config."""
         return self.ur.call("set_conf_value", index, value)
 
     def get_config(self):

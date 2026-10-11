@@ -1,6 +1,6 @@
 """uRemote client for desktop Python serial ports.
 
-This Windows/Linux adaptation is based on AntonsMindstorms uRemote 1.2:
+This Windows/macOS/Linux adaptation is based on AntonsMindstorms uRemote 1.3:
 https://github.com/AntonsMindstorms/uRemote/blob/main/library/uremote.py
 """
 
@@ -12,7 +12,7 @@ from typing import Any, Callable, Optional
 __author__ = "Anton Vanhoucke & Ste7an; desktop adaptation for Line Sensor"
 __copyright__ = "Copyright 2024,2025,2026 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.2-desktop"
+__version__ = "1.3-desktop"
 
 STATUS_OK = 0
 STATUS_ERR = 1
@@ -91,7 +91,7 @@ def select_serial_port(
 
 
 class uRemote:
-    """Synchronous uRemote RPC client using a Windows or Linux serial port.
+    """Synchronous uRemote RPC client using a desktop serial port.
 
     Args:
         port: Port name such as ``COM5`` or ``/dev/ttyACM0``.
@@ -173,15 +173,19 @@ class uRemote:
         while self._waiting():
             self.uart.read(self._waiting())
 
-    def _send_bytes(self, payload: bytes) -> None:
+    def _packet(self, payload: bytes) -> bytes:
         frame = PREAMBLE + payload
         if len(frame) > MAX_FRAME:
             raise uRemoteError("frame too large")
+        return bytes([len(frame)]) + frame
+
+    def _send_bytes(self, payload: bytes) -> None:
+        packet = self._packet(payload)
         try:
-            written = self.uart.write(bytes([len(frame)]) + frame)
+            written = self.uart.write(packet)
         except Exception as error:
             raise uRemoteError(f"Serial write failed: {error}") from error
-        if written is not None and written != len(frame) + 1:
+        if written is not None and written != len(packet):
             raise uRemoteError("Serial write was incomplete")
 
     def _recv_bytes(self) -> bytes:
@@ -194,23 +198,32 @@ class uRemote:
 
         length = self._read_byte()
         if length is None or length < MIN_FRAME or length > MAX_FRAME:
-            message = "No length byte" if length is None else "Invalid frame length"
+            message = (
+                "No length byte. Is the correct port selected?"
+                if length is None
+                else "Invalid frame length"
+            )
             return self._fail_rx(message)
 
         frame = bytearray()
         byte_deadline = time.monotonic() + self.byte_timeout / 1000
+        pre = 0
         while len(frame) < length:
             if time.monotonic() >= deadline:
-                return self._fail_rx("Incomplete frame")
+                return self._fail_rx("Incomplete frame.")
             value = self._read_byte()
             if value is not None:
                 frame.append(value)
+                if pre < PREAMBLE_LEN:
+                    if value != PREAMBLE[pre]:
+                        return self._fail_rx("Preamble mismatch.")
+                    pre += 1
                 byte_deadline = time.monotonic() + self.byte_timeout / 1000
             elif time.monotonic() >= byte_deadline:
-                return self._fail_rx("Inter-byte timeout")
+                return self._fail_rx("Inter-byte timeout.")
+            else:
+                time.sleep(0.001)
 
-        if bytes(frame[:PREAMBLE_LEN]) != PREAMBLE:
-            return self._fail_rx("Preamble mismatch")
         return bytes(frame[PREAMBLE_LEN:])
 
     def _encode(self, status: int, cmd: str, *argv: Any) -> bytes:
@@ -275,8 +288,7 @@ class uRemote:
     def _send_command(self, cmd: str, *data: Any, status: int = STATUS_OK) -> None:
         self._send_bytes(self._encode(status, cmd, *data))
 
-    def _recv_command(self) -> tuple[int, str, Any]:
-        encoded = self._recv_bytes()
+    def _decode_command(self, encoded: bytes) -> tuple[int, str, Any]:
         if not encoded:
             return STATUS_ERR, "", self._last_rx_error or "no bytes received"
         try:
@@ -285,17 +297,10 @@ class uRemote:
             self.flush()
             return STATUS_ERR, "", "decode error: " + str(error)
 
-    def exchange(self, cmd: str, *data: Any) -> tuple[int, str, Any]:
-        """Send a command and return raw ``(status, command, payload)``."""
+    def _recv_command(self) -> tuple[int, str, Any]:
+        return self._decode_command(self._recv_bytes())
 
-        self.flush()
-        self._send_command(cmd, *data)
-        return self._recv_command()
-
-    def call(self, cmd: str, *data: Any) -> Any:
-        """Call a sensor command and return None, a scalar, or a tuple."""
-
-        status, reply_cmd, payload = self.exchange(cmd, *data)
+    def _finish_call(self, cmd: str, status: int, reply_cmd: str, payload: Any) -> Any:
         if status != STATUS_OK or not reply_cmd:
             raise uRemoteError(payload if isinstance(payload, str) else str(payload))
         if reply_cmd != cmd:
@@ -303,7 +308,19 @@ class uRemote:
             raise uRemoteError(f"unexpected reply: {reply_cmd}")
         return _unwrap_result(payload)
 
+    def exchange(self, cmd: str, *data: Any) -> tuple[int, str, Any]:
+        """Send a command and return raw ``(status, command, payload)``."""
+
+        self._send_command(cmd, *data)
+        return self._recv_command()
+
+    def call(self, cmd: str, *data: Any) -> Any:
+        """Call a sensor command and return None, a scalar, or a tuple."""
+
+        self.flush()
+        self._send_command(cmd, *data)
+        return self._finish_call(cmd, *self._recv_command())
+
 
 # Conventional Python class alias while retaining the upstream API name.
 URemote = uRemote
-

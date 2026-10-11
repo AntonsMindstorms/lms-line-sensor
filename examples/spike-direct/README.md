@@ -81,4 +81,4 @@ For PD tuning and competition tips, see [The Surprising PID Line Follower Guide]
 
 ## When to use LMS-ESP32 instead
 
-Direct UART is the simple default for line following only. Use the [LMS-ESP32 + Pybricks path](../spike-robocup/) when you need multiple I2C sensors on one port, Wi-Fi, Bluetooth gamepads, or MicroBlocks workflows.
+Direct UART is the simple default for line following only. Use [`../lms-esp32-ur-server/`](../lms-esp32-ur-server/) when the sensor is on Qwiic and you want the same `LineSensorUR` API over an LMS-ESP32. Use [`../spike-robocup/`](../spike-robocup/) when you need PUPRemote channels, Wi-Fi, Bluetooth gamepads, or MicroBlocks workflows.

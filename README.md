@@ -3,46 +3,84 @@
 
 # LMS Line Sensor
 
-`lms-line-sensor` is a MicroPython and Pybricks driver for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) board. It provides two implementations: `LineSensorI2C` for direct I2C access on MicroPython devices, and `LineSensorUR` for remote access via Pybricks and [uRemote](https://github.com/AntonsMindstorms/uRemote). Both expose a unified API.
+Drivers, firmware, and tools for the [LMS Line Sensor](https://www.antonsmindstorms.com/product/8-channel-line-sensor-for-lego-spike-and-mindstorms/) — an 8-channel reflectance board for LEGO SPIKE, Robot Inventor, Technic, and EV3 with Pybricks, MicroPython, or MicroBlocks.
 
 </div>
 
-## Features
+## 1. Flash the sensor (firmware 5.6)
 
-- Reads 8 light sensor channels in a single transfer.
-- Exposes position, derivative, and line shape via normalized API.
-- Supports raw and calibrated sensor modes.
-- Calibration management with EEPROM persistence.
-- IR emitter and RGB LED control.
-- Aimed at ESP32 ([LMS-ESP32](https://www.antonsmindstorms.com/product/powerful-lms-esp32-board-for-spike-and-mindstorms/))
+Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.6.uf2)
+
+1. Connect the line sensor to your PC with USB.
+2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
+3. Drag the UF2 onto that drive and wait for it to disappear.
+4. If the NeoPixels do not scan, unplug and replug USB.
+
+Full hardware notes: [`firmware/README.md`](firmware/README.md).
+
+## 2. Pick a connection path
+
+| Goal | Path | Start here |
+| --- | --- | --- |
+| Configure / calibrate / watch values on a PC | USB → web dashboard | [linesensor.antonsmindstorms.com](https://linesensor.antonsmindstorms.com) or [`web/`](web/) |
+| Script the sensor from a PC | USB → desktop Python | [`usb/`](usb/) |
+| Hub wired straight to the sensor | UART uRemote → Pybricks | [`examples/spike-direct/`](examples/spike-direct/) |
+| Sensor on Qwiic, hub talks to LMS-ESP32 | Hub → `LineSensorUR` → LMS-ESP32 `LineSensorURServer` → I2C | [`examples/lms-esp32-ur-server/`](examples/lms-esp32-ur-server/) |
+| MicroPython on LMS-ESP32 only (no hub RPC) | I2C → `LineSensorI2C` | [`micropython/`](micropython/) |
+| Blocks programming | MicroBlocks library | [`microblocks/`](microblocks/) |
+
+### Approximate read timing (8 sensor values)
+
+Measured cycle times for reading eight channels (indicative; wiring and hub load vary):
+
+| Setup | ~cycle |
+| --- | --- |
+| LMS-ESP32 I2C @ 400 kHz | 1.3 ms |
+| USB → PC (uRemote) | 1.5 ms |
+| LMS-ESP32 I2C @ 100 kHz | 2.3 ms |
+| EV3 UART (direct) | 4 ms (`sensors()` ~5.2 ms; that call reads 13 bytes) |
+| SPIKE Prime UART (direct) | 8.2 ms |
+| EV3 I2C | 10 ms |
+| Prime ← LMS-ESP32 `LineSensorURServer` (uRemote) ← I2C | 14 ms |
+
+**PUPRemote note:** Prime ← PUPRemote ← LMS-ESP32 I2C can look like ~2.5 ms per hub poll, while the ESP32 side takes ~5 ms to push a new sample. The hub therefore often re-reads the same values before they update.
+
+Most of the I2C vs uRemote gap is framing overhead: uRemote sends about 33 bytes on the wire for 13 payload bytes; plain I2C and a PUPRemote `8B` channel do not add that framing.
 
 ## Installation
 
+### Web dashboard
+
+Open [linesensor.antonsmindstorms.com](https://linesensor.antonsmindstorms.com) in Chrome or Edge (Web Serial). Close any other app using the USB serial port first. See [`web/README.md`](web/README.md).
+
+### USB desktop Python
+
+```bash
+cd usb
+python -m pip install -r requirements.txt
+python read_line_sensor.py
+```
+
+### Pybricks (direct UART or via LMS-ESP32)
+
+Upload [`micropython/line_sensor_pybricks.py`](micropython/line_sensor_pybricks.py) into your Pybricks project.
+
 ### MicroPython on LMS-ESP32
 
-On the newest LMS-ESP32 firmware, the line sensor driver is pre-installed.
+On current LMS-ESP32 firmware the line sensor driver is often pre-installed. Otherwise install with [ViperIDE](https://viper-ide.org/):
 
-If you are on older firmware, install it with vipe-ide:
+1. Open ViperIDE → package manager → custom package.
+2. Paste `https://github.com/antonsmindstorms/lms-line-sensor.git` and install.
 
-1. Open vipe-ide.
-2. Open the package manager.
-3. Choose custom package.
-4. Paste the Git repository link: `https://github.com/antonsmindstorms/lms-line-sensor.git`.
-5. Install to the board.
+For hub ↔ ESP32 ↔ I2C sensor, also copy [`micropython/line_sensor_ur_server.py`](micropython/line_sensor_ur_server.py) (`uremote` is frozen on current LMS-ESP32 firmware).
 
-### Pybricks Installation
+### MicroBlocks
 
-Upload `line_sensor_pybricks.py` into your Pybricks project/environment.
+Open the [MicroBlocks editor](https://microblocks.fun/run/microblocks.html) and drag [`microblocks/LMS Line Sensor.ubl`](microblocks/LMS%20Line%20Sensor.ubl) into the window.
 
-### MicroBlocks Installation
+## Quick start
 
-Open a [microblocks editor](https://microblocks.fun/run/microblocks.html) and drag [LMS Line Sensor](<microblocks/LMS Line Sensor.ubl>) into the browser window.
-
-PyPI/pip installation is not part of the normal deployment flow for this project.
-
-## Quick Start
-
-### MicroPython via I2C
+### MicroPython via I2C (LMS-ESP32)
 
 ```python
 from time import sleep
@@ -55,110 +93,91 @@ sensor.load_calibration()
 sensor.mode_calibrated()
 
 while True:
-    position = sensor.position()
-    derivative = sensor.derivative()
-    pds = sensor.position_derivative_shape()
-    print(position, derivative)
-    print(pds)
+    print(sensor.position(), sensor.derivative(), sensor.shape())
     sleep(0.1)
 ```
 
-### Pybricks via uRemote
+### Pybricks via uRemote (direct UART or `LineSensorURServer`)
 
 ```python
+from pybricks.parameters import Port
 from line_sensor_pybricks import LineSensorUR
 
-sensor = LineSensorUR(port=1)
+sensor = LineSensorUR(Port.B)
 
 sensor.ir_power(True)
 sensor.load_calibration()
 sensor.mode_calibrated()
 
 while True:
-    position = sensor.position()
-    derivative = sensor.derivative()
-    pds = sensor.position_derivative_shape()
-    print(position, derivative)
-    print(pds)
+    print(sensor.position(), sensor.derivative(), sensor.shape())
 ```
 
 ### MicroBlocks
 
-Here's a simple program that reads the line shape and distance from center.
-Shape is an ASCII character in the shape of the line:
+Shape is an ASCII character:
 
-```ascii
-SHAPE_NONE     = ' ',
-SHAPE_STRAIGHT = '|',
-SHAPE_T        = 'T',
-SHAPE_L_LEFT   = '<',
-SHAPE_L_RIGHT  = '>',
+```text
+SHAPE_NONE     = ' '
+SHAPE_STRAIGHT = '|'
+SHAPE_T        = 'T'
+SHAPE_L_LEFT   = '<'
+SHAPE_L_RIGHT  = '>'
 SHAPE_Y        = 'Y'
 ```
 
 ![Microblocks example](docs/line-sensor-microblocks.png)
 
-###  Desktop Python library
+## API overview
 
-This si a library that can be used on a pc/desktop/laptop for using the lms-line-sensor when it is directly connected to the pc using the USB port. The library uses uRemote to communicate with the sensor. 
+`LineSensorI2C` and `LineSensorUR` share one high-level API. Prefer these names in new code:
 
-```
-usage: read_line_sensor.py [-h] [--port PORT] [--mode {current,raw,calibrated}] [--interval INTERVAL]
+| Method | Meaning |
+| --- | --- |
+| `position()` | Line position (−128…127, 0 = center) |
+| `derivative()` | Position derivative |
+| `shape()` | Shape as an ASCII character |
+| `sensors()` | Eight raw or calibrated values |
+| `position_derivative_shape()` | `(position, derivative, shape)` |
+| `data(*indices)` | Full packet or selected fields |
+| `mode_raw()` / `mode_calibrated()` | Acquisition mode |
+| `calibrate(duration=5)` | Calibrate and save to EEPROM |
+| `ir_power(True/False)` | IR emitter |
+| `leds(mode)` | Automatic NeoPixel mode |
+| `save_calibration()` / `load_calibration()` | EEPROM calibration |
 
-Read live values from the line sensor over USB uRemote.
+Compatibility aliases available on both classes: `set_emitter` (= `ir_power`) and `get_cal_min` / `get_cal_max` / `set_cal_min` / `set_cal_max`. `LineSensorI2C` also accepts `rgb_mode` / `led_mode` (= `leds`), `set_neopixel` (= `neopixel`) and `get_min` / `get_max` / `set_min` / `set_max`.
 
-options:
-  -h, --help            show this help message and exit
-  --port PORT           Serial port (for example COM5 or /dev/ttyACM0). Omit to choose interactively.
-  --mode {current,raw,calibrated}
-                        Sensor value mode (default: keep the current mode).
-  --interval INTERVAL   Seconds between readings (default: 0.25).
-```
+`LineSensorI2C` also has `start_calibration()` and fine-grained calibration helpers.
 
+Line polarity: firmware 5.6 defaults to a black line. Use `blackline(False)` for a white line (then recalibrate); the setting is not stored in EEPROM. Both classes provide it, and `LineSensorUR.blackline()` without an argument reads the current value.
 
-## API Overview
+`LineSensorURServer` (LMS-ESP32) subclasses frozen `uRemote` and exposes the native uRemote command names over UART while talking to the sensor on I2C.
 
-Both `LineSensorI2C` and `LineSensorUR` expose the same core API:
+## More examples
 
-- `position()` returns the current line position (-128 to 127, where 0 is center).
-- `derivative()` returns the derivative of the line position.
-- `shape()` returns the sensor-reported shape as an ASCII character.
-- `sensors()` returns the 8 raw or calibrated sensor values.
-- `position_derivative_shape()` returns a tuple of (position, derivative, shape).
-- `data(*indices)` returns the full 13-byte response or selected entries by index constant.
-- `mode_raw()` switches to raw reading mode.
-- `mode_calibrated()` switches to calibrated reading mode.
-- `calibrate(duration=5)` calibrates the sensor and saves calibration to EEPROM.
-- `ir_power(True/False)` controls the IR emitter.
-- `leds(mode)` changes the LED display mode.
-- `save_calibration()` stores calibration data in EEPROM.
-- `load_calibration()` loads calibration data from EEPROM.
-
-### I2C-Specific Features
-
-`LineSensorI2C` also provides:
-
-- `position_derivative_shape()` returns a tuple of (position, derivative, shape).
-- `check_line_type()` auto-detects black vs white line for value inversion.
-- `start_calibration()` and `save_calibration()` for fine-grained calibration control.
+- [`examples/spike-direct/`](examples/spike-direct/) — SPIKE hub, direct UART
+- [`examples/lms-esp32-ur-server/`](examples/lms-esp32-ur-server/) — hub + LMS-ESP32 + I2C sensor
+- [`examples/spike-pup-test/`](examples/spike-pup-test/) — SPIKE + LMS-ESP32 + I2C line sensor over PUPRemote
+- [`examples/spike-robocup/`](examples/spike-robocup/) — SPIKE + LMS-ESP32 with PUPRemote
+- [`examples/ev3-robocup/`](examples/ev3-robocup/) — EV3 + LMS-ESP32
+- [`examples/pybricks_smoke_test.py`](examples/pybricks_smoke_test.py) — quick UART bring-up
 
 ## Documentation
 
-You can read [the documentation on our API docs site](https://docs.antonsmindstorms.com/en/latest/Software/lms-line-sensor/docs/index.html) or build the Sphinx documentation from source in [docs](docs/). Build them with:
+- Published docs: [docs.antonsmindstorms.com … lms-line-sensor](https://docs.antonsmindstorms.com/en/latest/Software/lms-line-sensor/docs/index.html)
+- Firmware / registers / packets: [`firmware/README.md`](firmware/README.md) (canonical)
+- Sphinx sources: [`docs/`](docs/)
 
 ```bash
 sphinx-build -b html docs docs/_build/html
 ```
 
-## Development Notes
+## Development notes
 
 - Main MicroPython source: `micropython/line_sensor.py`
-- Pybricks bundle is generated from `micropython/line_sensor.py` via `tools/generate_line_sensor_pybricks.py`
-- Generated Pybricks standalone module: `micropython/line_sensor_pybricks.py`
-- API docs entry point: `docs/index.rst`
-- The Sphinx configuration mocks the MicroPython `machine` module so docs can be built on desktop Python.
-- Submit update to PyPI:
-  - Update version in [line_sensor.py](micropython/line_sensor.py)
-  - Update version in [package.json](package.json)
-  - Activate venv
-  - `rm -rf ./dist && python -m build && twine upload dist/*`
+- Pybricks bundle: `tools/generate_line_sensor_pybricks.py` → `micropython/line_sensor_pybricks.py`
+- LMS-ESP32 uRemote server: `micropython/line_sensor_ur_server.py`
+- Sphinx mocks the MicroPython `machine` module for desktop builds
+- Tests need no hardware: `python -m pip install pytest && python -m pytest` (see [`tests/README.md`](tests/README.md))
+- PyPI publish: bump version in `micropython/line_sensor.py` and `package.json`, then `rm -rf ./dist && python -m build && twine upload dist/*`

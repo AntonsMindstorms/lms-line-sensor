@@ -2,7 +2,11 @@
 
 Firmware for an eight-channel reflectance line sensor based on the CH32V203.
 The sensor can be controlled through I2C, UART uRemote, or USB CDC uRemote.
-A browser dashboard and a Windows/Linux Python client are included.
+A browser dashboard (`web/`) and a desktop Python client (`usb/`) are included.
+
+**This file is the canonical hardware / firmware reference** (flashing, packets,
+EEPROM, LED modes, command tables). Software onboarding lives in the root
+`README.md` and `docs/index.rst`.
 
 Current firmware version: **5.7**.
 
@@ -32,7 +36,7 @@ Current firmware version: **5.7**.
 - I2C slave interface at address `0x33`
 - Named uRemote API on UART and native USB CDC
 - Browser dashboard for configuration, calibration, visualization, and diagnostics
-- Desktop Python uRemote library for Windows and Linux
+- Desktop Python uRemote library for Windows, macOS, and Linux (`usb/`)
 
 ## Interfaces
 
@@ -288,18 +292,18 @@ For example, select white-line polarity over uRemote with
 `sensor.call("blackline", False)`. Calling `blackline` without an argument
 returns the current boolean state.
 
-For a comparison with the command names used by the external LMS line-sensor
-MicroPython driver, see
-[`../UREMOTE_COMMAND_COMPARISON.md`](../UREMOTE_COMMAND_COMPARISON.md).
+The Python driver `LineSensorUR` maps its methods to these command names; see
+[`../docs/API/lms-line-sensor-uremote-api.rst`](../docs/API/lms-line-sensor-uremote-api.rst)
+for the full API reference.
 
 ## Python USB client
 
-The [`library`](library/) directory contains a desktop adaptation of
-`uremote.py`, a port-selection helper, and a live-reading example for Windows
-and Linux.
+The [`usb`](../usb/) directory contains a desktop adaptation of
+`uremote.py`, a port-selection helper, and a live-reading example for Windows,
+macOS, and Linux.
 
 ```text
-cd library
+cd usb
 python -m pip install -r requirements.txt
 python read_line_sensor.py
 ```
@@ -324,7 +328,7 @@ with URemote(select_serial_port()) as sensor:
 
 ## USB web dashboard
 
-The [`web`](web/) directory contains a dependency-free HTML, CSS, and JavaScript
+The [`web`](../web/) directory contains a dependency-free HTML, CSS, and JavaScript
 dashboard. It implements uRemote directly over the browser Web Serial API.
 
 The dashboard provides:

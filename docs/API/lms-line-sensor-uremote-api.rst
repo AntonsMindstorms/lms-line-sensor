@@ -1,7 +1,7 @@
 LMS Line Sensor uRemote API
 ===========================
 
-| Firmware reference: **5.5**
+| Firmware reference: **5.6**
 | UART speed: **115200 baud**
 | USB product: **Line Sensor uRemote**
 
@@ -22,7 +22,7 @@ Only one application should open the USB serial port at a time.
 Calling commands from Python
 ----------------------------
 
-The desktop library is in the project's ``library`` directory:
+The desktop library is in the project's ``usb`` directory:
 
 .. code-block:: python
 
@@ -158,6 +158,14 @@ values.
 Examples
 --------
 
+Connection check:
+
+.. code-block:: python
+
+   uptime_ms = sensor.call("ping")
+   major, minor = sensor.call("version")
+   print("uptime", uptime_ms, "firmware", major, minor)
+
 Read device identity and firmware version:
 
 .. code-block:: python
@@ -174,6 +182,7 @@ Read processed line data:
    position = position_byte - 128
    derivative = derivative_byte - 128
    shape = chr(shape_byte)
+   packet = sensor.call("all")  # full 13-byte measurement
 
 Configure calibrated operation:
 
@@ -183,6 +192,15 @@ Configure calibrated operation:
    sensor.call("load_cal")
    sensor.call("set_mode_cal")
    values = sensor.call("data")
+
+Start a timed calibration (optional ``save`` flag, then wait for the duration
+stored in EEPROM config):
+
+.. code-block:: python
+
+   sensor.call("calibrate", 1)
+   # LEDs indicate calibration; sweep black and white until it finishes.
+   print("calibrated", sensor.call("is_calibrated"))
 
 Select white-line polarity before calibration or measurement:
 

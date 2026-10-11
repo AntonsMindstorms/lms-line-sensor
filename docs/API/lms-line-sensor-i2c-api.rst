@@ -1,7 +1,7 @@
 LMS Line Sensor I2C API
 =======================
 
-| Firmware reference: **5.5**
+| Firmware reference: **5.6**
 | Default 7-bit slave address: **``0x33``**
 | Sensor channels: **8**
 
@@ -304,17 +304,30 @@ Select calibrated mode and read measurements:
 
 .. code-block:: python
 
-   i2c.writeto(ADDRESS, bytes([1]))
+   i2c.writeto(ADDRESS, bytes([1]))  # CMD_SET_MODE_CAL
    packet = i2c.readfrom(ADDRESS, 13)
    values = tuple(packet[:8])
    position = packet[8] - 128
+   derivative = packet[11] - 128
+   shape = chr(packet[12])
 
 Read firmware version:
 
 .. code-block:: python
 
-   i2c.writeto(ADDRESS, bytes([2]))
+   i2c.writeto(ADDRESS, bytes([2]))  # CMD_GET_VERSION
    major, minor = i2c.readfrom(ADDRESS, 2)
+
+Enable the IR emitter and start calibration (save when finished):
+
+.. code-block:: python
+
+   from time import sleep
+
+   i2c.writeto(ADDRESS, bytes([14, 1]))  # CMD_SET_EMITTER on
+   i2c.writeto(ADDRESS, bytes([4, 1]))   # CMD_CALIBRATE, save=1
+   sleep(6)  # match EEPROM calibration duration
+   i2c.writeto(ADDRESS, bytes([1]))      # CMD_SET_MODE_CAL
 
 Select white-line polarity:
 

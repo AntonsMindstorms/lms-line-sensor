@@ -6,6 +6,8 @@ Do not edit by hand. Regenerate with:
 
 __all__ = ['BaseLineSensor', 'LineSensorUR', 'uRemote', 'uRemoteError', '__version__']
 
+__version__ = "0.3.2"
+
 """Shared API and constants for LMS line sensor drivers."""
 
 class BaseLineSensor:
@@ -128,11 +130,14 @@ class BaseLineSensor:
     def mode_raw(self):
         return self.mode(self.MODE_RAW)
 
-"""Minimal Pybricks-only uRemote client for standalone bundling."""
+"""Minimal Pybricks-only uRemote client for standalone bundling.
+
+Derived from AntonsMindstorms uRemote 1.3 (Pybricks client paths only).
+"""
 
 from pybricks.iodevices import UARTDevice
 from pybricks.parameters import Port
-from pybricks.tools import StopWatch, wait
+from pybricks.tools import StopWatch, wait, run_task
 
 
 def const(value):
@@ -157,16 +162,21 @@ class uRemoteError(Exception):
     pass
 
 
+def _as_values(data):
+    if isinstance(data, list):
+        return data
+    return [] if data is None else [data]
+
+
 def _unwrap_result(payload):
-    if payload is None:
+    values = _as_values(payload)
+    if not values:
         return None
-    if isinstance(payload, list):
-        return payload[0] if len(payload) == 1 else tuple(payload)
-    return payload
+    return values[0] if len(values) == 1 else tuple(values)
 
 
 class uRemote:
-    """Pybricks UART RPC client."""
+    """Pybricks UART RPC client (sync and async)."""
 
     def __init__(
         self, port_or_uart=1, baudrate=115200, wait_recv=1000, uart_timeout=1000, power_pin=2
@@ -174,59 +184,69 @@ class uRemote:
         self.byte_timeout = 10
         self.wait_recv = wait_recv
         self._last_rx_error = None
+        self._async_busy = False
         self._watch = StopWatch()
         if isinstance(port_or_uart, str):
             port_or_uart = getattr(Port, port_or_uart)
         self.uart = UARTDevice(port_or_uart, timeout=uart_timeout, power_pin=power_pin)
         self.uart.set_baudrate(baudrate)
         self.uart.read_all()
-
-    def _ticks(self):
-        return self._watch.time()
-
-    def _elapsed(self, start):
-        return self._watch.time() - start
-
-    def _waiting(self):
-        return self.uart.waiting()
-
-    def _read_byte(self):
-        data = self.uart.read(1)
-        return data[0] if data else None
-
-    def flush(self):
-        while self._waiting():
-            self.uart.read_all()
+        self._ticks = self._watch.time
+        self._elapsed = lambda start: self._watch.time() - start
+        self._pause = wait
+        self._waiting = self.uart.waiting
+        self._drain = self.uart.read_all
 
     def _fail_rx(self, error):
         self.flush()
         self._last_rx_error = "Read error: " + error
         return b""
 
-    def _send_bytes(self, payload):
+    def _require_sync_uart(self):
+        if run_task():
+            raise uRemoteError("use call_async() under run_task()/multitask()")
+
+    def flush(self):
+        """Discard all bytes waiting in the UART receive buffer."""
+        while self._waiting():
+            self._drain()
+
+    def _packet(self, payload):
         frame = PREAMBLE + payload
         if len(frame) > MAX_FRAME:
             raise uRemoteError("frame too large")
-        self.uart.write(bytes([len(frame)]) + frame)
+        return bytes([len(frame)]) + frame
+
+    def _send_bytes(self, payload):
+        self.uart.write(self._packet(payload))
+
+    def _read_byte(self):
+        data = self.uart.read(1)
+        return data[0] if data else None
+
+    async def _read_byte_async(self):
+        data = await self.uart.read(1)
+        return data[0] if data else None
 
     def _recv_bytes(self):
         self._last_rx_error = None
         start = self._ticks()
         while self._elapsed(start) < self.wait_recv and not self._waiting():
-            wait(1)
+            self._pause(1)
         if not self._waiting():
             return self._fail_rx("No data. Is remote script running?")
 
         length = self._read_byte()
         if length is None or length < MIN_FRAME or length > MAX_FRAME:
-            if length is None:
-                return self._fail_rx("No length byte. Is remote script running?")
-            return self._fail_rx("Invalid frame length")
+            return self._fail_rx(
+                "No length byte. Is remote script running?"
+                if length is None
+                else "Invalid frame length"
+            )
 
         payload = bytearray()
-        total_start = self._ticks()
-        byte_start = total_start
-        preamble_index = 0
+        total_start = byte_start = self._ticks()
+        pre = 0
         while len(payload) < length:
             if self._elapsed(total_start) > self.wait_recv:
                 return self._fail_rx("Incomplete frame.")
@@ -235,15 +255,53 @@ class uRemote:
                 if value is None:
                     return self._fail_rx("Incomplete frame.")
                 payload.append(value)
-                if preamble_index < PREAMBLE_LEN:
-                    if value != PREAMBLE[preamble_index]:
+                if pre < PREAMBLE_LEN:
+                    if value != PREAMBLE[pre]:
                         return self._fail_rx("Preamble mismatch.")
-                    preamble_index += 1
+                    pre += 1
                 byte_start = self._ticks()
             elif self._elapsed(byte_start) > self.byte_timeout:
                 return self._fail_rx("Inter-byte timeout.")
             else:
-                wait(1)
+                self._pause(1)
+        return bytes(payload[PREAMBLE_LEN:])
+
+    async def _recv_bytes_async(self):
+        self._last_rx_error = None
+        start = self._ticks()
+        while self._elapsed(start) < self.wait_recv and not self._waiting():
+            await wait(0)
+        if not self._waiting():
+            return self._fail_rx("No data. Is remote script running?")
+
+        length = await self._read_byte_async()
+        if length is None or length < MIN_FRAME or length > MAX_FRAME:
+            return self._fail_rx(
+                "No length byte. Is remote script running?"
+                if length is None
+                else "Invalid frame length"
+            )
+
+        payload = bytearray()
+        total_start = byte_start = self._ticks()
+        pre = 0
+        while len(payload) < length:
+            if self._elapsed(total_start) > self.wait_recv:
+                return self._fail_rx("Incomplete frame.")
+            if self._waiting():
+                value = await self._read_byte_async()
+                if value is None:
+                    return self._fail_rx("Incomplete frame.")
+                payload.append(value)
+                if pre < PREAMBLE_LEN:
+                    if value != PREAMBLE[pre]:
+                        return self._fail_rx("Preamble mismatch.")
+                    pre += 1
+                byte_start = self._ticks()
+            elif self._elapsed(byte_start) > self.byte_timeout:
+                return self._fail_rx("Inter-byte timeout.")
+            else:
+                await wait(0)
         return bytes(payload[PREAMBLE_LEN:])
 
     def _encode(self, status, cmd, *argv):
@@ -292,21 +350,59 @@ class uRemote:
             decoded = decoded[0]
         return status, cmd, decoded
 
-    def call(self, cmd, *data):
-        self._send_bytes(self._encode(STATUS_OK, cmd, *data))
-        reply = self._recv_bytes()
-        if not reply:
-            raise uRemoteError(self._last_rx_error or "no bytes received")
+    def _send_command(self, cmd, *data, status=STATUS_OK):
+        self._send_bytes(self._encode(status, cmd, *data))
+
+    async def _send_command_async(self, cmd, *data, status=STATUS_OK):
+        await self.uart.write(self._packet(self._encode(status, cmd, *data)))
+
+    def _decode_command(self, encoded):
+        if not encoded:
+            return STATUS_ERR, "", self._last_rx_error or "no bytes received"
         try:
-            status, reply_cmd, payload = self._decode(reply)
+            return self._decode(encoded)
         except (ValueError, IndexError, UnicodeError) as exc:
             self.flush()
-            raise uRemoteError("decode error: " + str(exc))
+            return STATUS_ERR, "", "decode error: " + str(exc)
+
+    def _recv_command(self):
+        return self._decode_command(self._recv_bytes())
+
+    async def _recv_command_async(self):
+        return self._decode_command(await self._recv_bytes_async())
+
+    def _finish_call(self, cmd, status, reply_cmd, payload):
         if status != STATUS_OK or not reply_cmd:
             raise uRemoteError(payload if isinstance(payload, str) else str(payload))
         if reply_cmd != cmd:
+            self.flush()
             raise uRemoteError("unexpected reply: " + reply_cmd)
         return _unwrap_result(payload)
+
+    def exchange(self, cmd, *data):
+        """Send a command and return ``(status, reply_cmd, payload)``."""
+        self._require_sync_uart()
+        self._send_command(cmd, *data)
+        return self._recv_command()
+
+    def call(self, cmd, *data):
+        """Call a remote command and return its result."""
+        self._require_sync_uart()
+        self.flush()
+        self._send_command(cmd, *data)
+        return self._finish_call(cmd, *self._recv_command())
+
+    async def call_async(self, cmd, *data):
+        """Async call for use under ``run_task()`` / ``multitask()``."""
+        while self._async_busy:
+            await wait(0)
+        self._async_busy = True
+        try:
+            self.flush()
+            await self._send_command_async(cmd, *data)
+            return self._finish_call(cmd, *(await self._recv_command_async()))
+        finally:
+            self._async_busy = False
 
 """uRemote transport for the LMS line sensor."""
 
@@ -372,6 +468,9 @@ class LineSensorUR(BaseLineSensor):
     def set_cal_max(self, values):
         self._require_sensor_count(values, 'set_cal_max')
         return self.ur.call('set_cal_max', *values)
+
+    def set_conf_value(self, index, value):
+        return self.ur.call('set_conf_value', index, value)
 
     def get_config(self):
         return self._bytes_tuple(self.ur.call('get_config'))

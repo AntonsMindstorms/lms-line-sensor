@@ -1,135 +1,77 @@
 LMS Line Sensor
 ===============
 
-Firmware for an eight-channel reflectance line sensor based on the CH32V203.
-The sensor supports I2C, UART uRemote, and USB CDC uRemote. A browser dashboard
-and a Windows/Linux Python client are included.
+Software and firmware for the eight-channel LMS reflectance line sensor
+(CH32V203). The board speaks I2C, UART uRemote, and USB CDC uRemote.
 
-**Current firmware version: 5.5**
+**Current firmware version: 5.6**
 
-Features
---------
+Firmware, flashing, packet layout, EEPROM, LED modes, and the low-level command
+tables are maintained in the repository file ``firmware/README.md``. This page
+covers software usage and links into the Python and protocol API docs.
 
-- Eight raw or calibrated reflectance values.
-- Line position and position derivative.
-- Shape recognition for straight, T, left, right, and Y intersections.
-- EEPROM-backed calibration and configuration.
-- Configurable IR https://github.com/AntonsMindstorms/lms-line-sensor/tree/main/docsemitter.
-- Selectable black-line or white-line input polarity.
-- Eight sensor NeoPixels plus one indicator NeoPixel.
-- Automatic LED modes for values, inverted values, and line position.
-- Unique 12-byte CH32V203 device ID.
-- I2C slave interface at address ``0x33``.
-- Named uRemote API on UART and native USB CDC.
-- Browser dashboard for configuration, calibration, visualization, and diagnostics.
-- Desktop Python uRemote library for Windows and Linux.
+Flash firmware
+--------------
 
-Interfaces
-----------
+1. Connect the line sensor to your PC with USB.
+2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
+3. Drag ``firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`` onto that drive.
+4. Wait for the drive to disappear. Unplug and replug USB if NeoPixels do not scan.
 
-.. list-table::
-   :header-rows: 1
+Web dashboard
+-------------
 
-   * - Interface
-     - Settings
-     - Protocol
-   * - I2C
-     - Slave address ``0x33``
-     - Numeric byte commands and binary replies
-   * - UART
-     - 115200 baud
-     - Framed uRemote
-   * - USB CDC
-     - VID ``0xCAFE``, PID ``0x4001``, product ``Line Sensor uRemote``
-     - Framed uRemote
+Hosted UI (Chrome or Edge, Web Serial)::
 
-UART and USB expose the same named uRemote handlers. USB CDC carries protocol
-frames only and does not emit unsolicited text logs. Use the web dashboard or
-the diagnostic uRemote commands instead of a normal text terminal.
+   https://linesensor.antonsmindstorms.com
 
-Only one application should open the USB serial port at a time. Disconnect the
-web dashboard before using the Python client or another serial application.
+Sources live in ``web/``. See ``web/README.md``. Close the dashboard before
+opening the USB port from another program.
 
-Flashing firmware
------------------
+Choose a software path
+----------------------
 
-1. Connect the Line Sensor board to your PC using USB.
-2. Press the **RESET** button twice in quick succession.
-3. A mass-storage device named **CH32V UF2** should appear in the file manager.
-4. Drag the line-sensor UF2 firmware file onto the **CH32V UF2** drive.
-5. Wait until the firmware is written. The mass-storage device disappears
-   automatically.
-6. If the NeoPixels do not scan, disconnect and reconnect USB power.
+* **USB from a PC** — ``usb/`` Python client, or the web dashboard above.
+* **Pybricks, sensor on the hub UART** — ``LineSensorUR`` in
+  ``micropython/line_sensor_pybricks.py``.
+* **Pybricks + LMS-ESP32 + I2C sensor** — ``LineSensorUR`` on the hub and
+  ``LineSensorURServer`` on the ESP32 (``micropython/line_sensor_ur_server.py``).
+* **MicroPython on LMS-ESP32 only** — ``LineSensorI2C`` in
+  ``micropython/line_sensor.py``.
+* **MicroBlocks** — ``microblocks/LMS Line Sensor.ubl``.
 
-Startup indication
-------------------
+Performance (approximate)
+-------------------------
 
-The startup NeoPixel scan reports the stored calibration/emitter configuration.
+Indicative cycle times for reading eight sensor channels (wiring and hub load
+vary):
 
 .. list-table::
    :header-rows: 1
 
-   * - Load calibration
-     - Emitter
-     - Scan color
-   * - Off
-     - Off
-     - Blue
-   * - Off
-     - On
-     - Yellow
-   * - On
-     - Off
-     - Red
-   * - On
-     - On
-     - Green
+   * - Setup
+     - Approximate cycle
+   * - LMS-ESP32 I2C @ 400 kHz
+     - 1.3 ms
+   * - USB to PC (uRemote)
+     - 1.5 ms
+   * - LMS-ESP32 I2C @ 100 kHz
+     - 2.3 ms
+   * - EV3 UART (direct)
+     - 4 ms (``sensors()`` ~5.2 ms when reading 13 bytes)
+   * - SPIKE Prime UART (direct)
+     - 8.2 ms
+   * - EV3 I2C
+     - 10 ms
+   * - Prime via LMS-ESP32 ``LineSensorURServer`` (uRemote) and I2C
+     - 14 ms
 
-USB web dashboard
------------------
+PUPRemote (Prime ← LMS-ESP32 I2C) can show ~2.5 ms per hub poll while the ESP32
+needs ~5 ms to publish a new sample, so the hub often re-reads unchanged values.
 
-The ``web`` directory contains a dependency-free HTML, CSS, and JavaScript
-dashboard. It implements uRemote directly through the browser Web Serial API.
-
-The dashboard provides:
-
-- USB connection and UID display.
-- Raw/calibrated mode, emitter, and black/white line control.
-- Numeric values and bar graphs for all eight sensors.
-- Signed position and shape indication.
-- Calibration start, load, save, minima, and maxima.
-- EEPROM configuration editing.
-- LED-mode and per-pixel NeoPixel tests.
-- Live emitter, sensor-mode, LED-mode, and line-type status.
-- On-demand command and runtime diagnostics.
-- Light and dark themes.
-
-Sensor data is requested every 250 ms. Runtime status is refreshed approximately
-once per second while connected.
-
-Start the dashboard
-~~~~~~~~~~~~~~~~~~~
-
-Connect the USB port of the LMS Line Sensor to the USB port of your PC. 
-Open ``https://linesensor.antonsmindstorms.com`` in Chrome or Edge, select **Connect USB**, and
-choose **Line Sensor uRemote**. Firefox and Safari do not currently provide the
-required Web Serial API.
-
-Dashboard diagnostics
-~~~~~~~~~~~~~~~~~~~~~
-
-Open **On-demand diagnostics / Command trace** and select **Refresh**. The panel
-shows:
-
-- Firmware uptime.
-- I2C request-queue overflow count.
-- Most recent UART uRemote command and parameters.
-- Most recent I2C command and parameters.
-
-USB dashboard requests are excluded from the trace, so normal page polling does
-not overwrite the UART or I2C command being investigated. Connection and command
-failures appear as dashboard notifications. Browser-side errors are available
-in the Chrome/Edge Developer Tools Console.
+uRemote framing is the main overhead versus I2C: about 33 bytes on the wire for
+13 payload bytes. Plain I2C and a PUPRemote ``8B`` channel do not add that
+framing.
 
 Usage
 -----
@@ -137,12 +79,9 @@ Usage
 MicroPython with I2C
 ********************
 
-Create a sensor instance by passing the I2C pin assignments and, if needed, a custom device address.
-
 .. code-block:: python
 
    from time import sleep
-
    from line_sensor import LineSensorI2C
 
    sensor = LineSensorI2C(scl_pin=4, sda_pin=5, device_addr=51)
@@ -151,67 +90,80 @@ Create a sensor instance by passing the I2C pin assignments and, if needed, a cu
    sensor.mode_calibrated()
 
    while True:
-       print(sensor.position(), sensor.derivative())
+       print(sensor.position(), sensor.derivative(), sensor.shape())
        sleep(0.1)
 
 Pybricks with uRemote
 *********************
 
-`uRemote <https://github.com/AntonsMindstorms/uRemote>`_ provides UART RPC between the Pybricks hub and LMS-ESP32.
-
-Create a sensor instance by passing the uRemote port.
+Works for a direct UART cable to the sensor, or for an LMS-ESP32 running
+``LineSensorURServer``.
 
 .. code-block:: python
 
-   from line_sensor_pybricks import LineSensorUR
    from pybricks.parameters import Port
+   from line_sensor_pybricks import LineSensorUR
 
-   sensor = LineSensorUR(Port.S1)
+   sensor = LineSensorUR(Port.B)
    sensor.ir_power(True)
    sensor.load_calibration()
    sensor.mode_calibrated()
 
    while True:
-       print(sensor.position(), sensor.derivative())
+       print(sensor.position(), sensor.derivative(), sensor.shape())
        wait(100)
 
-Useful constants exposed by the sensor classes include:
+Prefer these high-level names in new code: ``ir_power``, ``leds``,
+``save_calibration``, ``load_calibration``. Compatibility aliases
+``set_emitter`` and ``get_cal_min``/``get_cal_max``/``set_cal_min``/``set_cal_max``
+exist on both classes; ``LineSensorI2C`` also accepts ``led_mode``,
+``rgb_mode`` and ``set_neopixel``.
 
-- ``MODE_RAW`` and ``MODE_CALIBRATED`` for acquisition mode selection.
-- ``LEDS_OFF``, ``LEDS_VALUES``, ``LEDS_VALUES_INVERTED``, ``LEDS_POSITION``, and ``LEDS_MAX`` for LED display modes.
-- ``POSITION``, ``MIN``, ``MAX``, ``DERIVATIVE``, and ``SHAPE`` for indexing values returned by ``data()``.
-- ``SHAPE_STRAIGHT``, ``SHAPE_T``, ``SHAPE_L_LEFT``, ``SHAPE_L_RIGHT``, ``SHAPE_Y``, and ``SHAPE_NONE`` for line shape constants.
+Line polarity: firmware 5.6 defaults to a black line on a light surface. Call
+``sensor.blackline(False)`` for a white line, then recalibrate. The setting is
+not stored in EEPROM, so call it again after power-up. ``blackline()`` without
+an argument returns the current setting on ``LineSensorUR``.
+
+Useful constants:
+
+- ``MODE_RAW`` and ``MODE_CALIBRATED``
+- ``LEDS_OFF``, ``LEDS_VALUES``, ``LEDS_VALUES_INVERTED``, ``LEDS_POSITION``
+- ``POSITION``, ``MIN``, ``MAX``, ``DERIVATIVE``, ``SHAPE`` for ``data()``
+- ``SHAPE_STRAIGHT``, ``SHAPE_T``, ``SHAPE_L_LEFT``, ``SHAPE_L_RIGHT``,
+  ``SHAPE_Y``, ``SHAPE_NONE``
+
+LMS-ESP32 uRemote server
+************************
+
+.. code-block:: python
+
+   from line_sensor_ur_server import LineSensorURServer
+
+   ls = LineSensorURServer()
+   while True:
+       ls.process()
+
+See ``examples/lms-esp32-ur-server/`` for a paired hub script.
 
 MicroBlocks
 ***********
 
-Quick example program:
-
 .. image:: line-sensor-microblocks.png
-
 
 Python USB client
 -----------------
 
-The ``library`` directory contains the desktop ``uremote.py`` adaptation, port
-selection, and a live-reading example for Windows and Linux.
-
 .. code-block:: console
 
-   cd library
+   cd usb
    python -m pip install -r requirements.txt
    python read_line_sensor.py
 
-The example lists detected ports and asks which one to open. A port can also be
-provided directly:
-
-.. code-block:: console
-
-   python read_line_sensor.py --port COM5 --mode raw
-   python read_line_sensor.py --port /dev/ttyACM0 --mode calibrated
+Works on Windows, macOS, and Linux. See ``usb/README.md``.
 
 API reference
 -------------
+
 Python module reference
 ***********************
 

@@ -6,7 +6,7 @@ import textwrap
 
 PYBRICKS_OMIT_TAG = "[pybricks:omit]"
 
-BASE_OMIT_CONSTANTS = frozenset({"MODE_SAVING", "MODE_CALIBRATING", "MIN", "MAX"})
+BASE_OMIT_CONSTANTS = frozenset({"MODE_SAVING", "MODE_DIGITAL", "MODE_CALIBRATING", "MIN", "MAX"})
 
 
 def _docstring(node):
