@@ -4,7 +4,7 @@ Firmware for an eight-channel reflectance line sensor based on the CH32V203.
 The sensor can be controlled through I2C, UART uRemote, or USB CDC uRemote.
 A browser dashboard and a Windows/Linux Python client are included.
 
-Current firmware version: **5.6**.
+Current firmware version: **5.7**.
 
 ## How to flash firmware on the Line Sensor board
 
@@ -131,6 +131,27 @@ The configuration is seven bytes long:
 Loading configuration applies the stored emitter setting. Saving configuration
 recalculates the CRC.
 
+### Calibration defaults and EEPROM layout
+
+Firmware 5.7 initializes the in-memory calibration limits to `0` and `255`, so
+calibrated mode provides identity-scaled readings before a measured calibration
+is loaded or performed. These defaults do not set the `is_calibrated` state.
+
+On the first 5.7 boot, invalid configuration or an outdated calibration-storage
+marker writes the `0`/`255` limits to EEPROM. **Save EEPROM** also stores any
+valid current limits, including these defaults. A later **Load EEPROM** then
+loads them as a valid calibration.
+
+The EEPROM library exposes 26 addressable bytes. Firmware 5.7 uses 24:
+
+| Positions | Contents |
+|---:|---|
+| `0-7` | Eight calibration minima |
+| `8-15` | Eight calibration maxima |
+| `16` | Calibration-storage version marker |
+| `17-23` | Seven-byte configuration |
+| `24-25` | Unused |
+
 At power-up, the NeoPixel scan shows the configured startup state:
 
 | Calibration at startup | Emitter at startup | Scan color |
@@ -235,8 +256,8 @@ commands and behavior.
 | `debug`, `debug_status` | Arguments ignored | Uptime, mode, calibrated, emitter, LED mode, I2C overflow count |
 | `last_commands` | None | Last UART command/parameters/time and last I2C command/parameters/time |
 | `calibrate` | Optional save flag | Start calibration; returns `1` |
-| `is_calibrated` | None | Calibration-active flag |
-| `save`, `save_cal` | None | Save calibration; returns `1` |
+| `is_calibrated` | None | Valid loaded/measured calibration flag |
+| `save`, `save_cal` | None | Save valid current limits; returns `1` or a save error |
 | `load`, `load_cal` | None | Load calibration; returns `1` or an invalid-calibration error |
 | `neopixel` | Index, red, green, blue | Set pixel `0-8`; returns `1` |
 | `print` | Numeric value | Return the numeric value |
@@ -315,7 +336,7 @@ The dashboard provides:
 - Calibration start, load, save, minima, and maxima
 - EEPROM configuration editing
 - LED mode and per-pixel NeoPixel tests
-- Live emitter, sensor-mode, LED-mode, and line-type status
+- Live firmware version, emitter, sensor-mode, LED-mode, and line-type status
 - On-demand command and runtime diagnostics
 - Light and dark themes
 
@@ -346,7 +367,8 @@ Because the USB port contains framed uRemote traffic, use the dashboard rather
 than a text terminal for diagnostics:
 
 1. Connect the sensor and confirm that the connection indicator is online.
-2. Check the status strip for emitter, raw/calibrated mode, LED mode, and line type.
+2. Check the status strip for firmware version, emitter, raw/calibrated mode,
+   LED mode, and line type.
 3. Open **On-demand diagnostics / Command trace**.
 4. Select **Refresh** to call `debug_status` and `last_commands`.
 
