@@ -1,7 +1,8 @@
 """The uRemote wire protocol, checked against three implementations.
 
-``firmware``  micropython/vendor/uremote.py (LMS-ESP32, OpenMV, Pybricks)
-``pybricks``  micropython/vendor/uremote_pybricks.py (hub-only trim)
+``firmware``  micropython/vendor/uRemote/library/uremote.py (submodule; LMS-ESP32,
+              OpenMV, Pybricks)
+``pybricks``  the hub-only client trimmed from it inside line_sensor_pybricks.py
 ``desktop``   usb/uremote.py (pyserial)
 
 Frames are built and checked with the independent encoder in ``fakes.py``.
@@ -28,7 +29,7 @@ def impl(request, bench, desktop_uremote):
         client = module.uRemote(5)
         peer = bench.link("uart5", "peer")[1]
     elif request.param == "pybricks":
-        module = importlib.import_module("uremote_pybricks")
+        module = importlib.import_module("line_sensor_pybricks")
         client = module.uRemote("B")
         peer = bench.link("portB", "peer")[1]
     else:

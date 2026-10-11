@@ -12,7 +12,8 @@ Already verified on hardware: `examples/ev3-robocup/p_controller_line_mower.py`
 `examples/lms-esp32-ur-server/` — highest priority. `LineSensorURServer`
 subclasses the frozen `uremote` in the LMS-ESP32 firmware and uses its internal
 methods (`_waiting`, `_recv_command`, `_send_command`). The tests only ran it
-against the vendored uRemote 1.3.
+against the uRemote submodule (`feature/auto-async`), not the version frozen
+into the LMS-ESP32 firmware.
 
 - [ ] `hub_main.py` against `esp32_main.py` reads position, shape and sensors.
 - [ ] `blackline`, `leds` and `get_config` round-trip from the hub.
@@ -59,7 +60,29 @@ power-up default and the setting is not stored in EEPROM.
       and `get_configuration()` shows the new value.
 - [ ] `from line_sensor_pybricks import *` imports without error.
 
-## 5. Quick checks
+## 5. Async use on the hub (`run_task()` / `multitask()`)
+
+Inside `run_task()` every `LineSensorUR` call returns an awaitable; outside it
+returns plain values. Simulated only: the fake wire answers instantly, a real
+UART does not.
+
+- [ ] Blocking use still works and is not noticeably slower than before
+      (read cycle time, direct UART and via the LMS-ESP32).
+- [ ] `await sensor.position()` in a `multitask()` program, with a second task
+      doing other work (for example driving motors), gives correct readings.
+- [ ] Two tasks calling the sensor at the same time do not corrupt each other's
+      replies.
+- [ ] `await sensor.calibrate()` works inside `run_task()` (it reads the
+      calibration time from the sensor on first use).
+- [ ] `examples/ev3-robocup/p_controller_line_mower_async.py` on the EV3: it
+      follows the line while the face animates, the eyes look the right way,
+      the face stays animated during calibration (center button), and the
+      motors stop when the program is interrupted. Check the animation does not
+      slow the steering noticeably compared with `p_controller_line_mower.py`.
+- [ ] The bundle size is acceptable on the hub (it now contains the async
+      uRemote client): upload time and start-up time.
+
+## 6. Quick checks
 
 - [ ] `python usb/read_line_sensor.py` works (the folder moved from
       `desktop_python_library/`).
@@ -68,6 +91,11 @@ power-up default and the setting is not stored in EEPROM.
       `spike-pup-test/`, `spike-robocup/`.
 
 ## Known, not blocking
+
+- In `run_task()` mode the `LineSensorUR` constructor creates a config read and
+  drops it unawaited (the first awaited `get_config()` does the work). Harmless
+  on MicroPython; CPython warns, which the tests filter.
+- `micropython/README.md` changed line endings from CRLF to LF on this branch.
 
 - `pyproject.toml` lists `line_sensor` as a package although it is a single
   module, so `python -m build` is probably broken. Only matters for a PyPI

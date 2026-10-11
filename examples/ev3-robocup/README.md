@@ -14,6 +14,7 @@ Start with the P controller to feel how proportional steering works, then switch
 | ---- | ------- | ------- |
 | [`p_controller_line_mower.py`](p_controller_line_mower.py) | EV3 | P-only line follower — good first step for tuning `KP`. |
 | [`pd_controller_line_mower.py`](pd_controller_line_mower.py) | EV3 | PD line follower — adds derivative for faster reactions on sharp turns. |
+| [`p_controller_line_mower_async.py`](p_controller_line_mower_async.py) | EV3 | The P line follower with `async`/`await`: it drives and animates a face on the screen at the same time. |
 
 ## Hardware
 
@@ -79,3 +80,20 @@ steer = pos * KP + der * KD
 Tune `KP`, `KD`, and `BASE_DC` in the script you are running. Start with P only — raise `KP` until the robot tracks well but does not oscillate — then try PD and add a small `KD`. For tuning theory and videos of P vs PD on 90° corners, see the [blog post](https://www.antonsmindstorms.com/2026/04/22/pid-line-follower-ev3-spike-prime/).
 
 Shape values are ASCII characters: `|` straight, `<` / `>` turns, `Y` split, `T` junction, or space when no line is detected.
+
+## Async version: a face that follows the line
+
+[`p_controller_line_mower_async.py`](p_controller_line_mower_async.py) is the P controller written for Pybricks `run_task()` / `multitask()`. Two tasks run at the same time:
+
+- `follow()` reads the sensor and steers, exactly like the P script.
+- `animate()` draws a face on the EV3 screen. Its eyes look where the line is, a dot on a track below shows the sensor position, it blinks every three seconds, and it looks surprised when the line is lost.
+
+Press the center button to calibrate. While `await ls.calibrate()` waits for the sensor, the robot stops and the face turns dizzy, but the screen keeps animating. With the blocking version the screen would freeze for the whole calibration.
+
+What changes compared with the blocking script is small: inside `run_task()` every `LineSensorUR` call returns an awaitable, so you write `await` in front of it. There are no separate async methods.
+
+```python
+pos, shape = await ls.data(ls.POSITION, ls.SHAPE)
+```
+
+This example needs a Pybricks firmware with `run_task()` and `multitask()`, and the generated `line_sensor_pybricks.py` from this repository.

@@ -190,13 +190,13 @@ class TestAdaptUrForBundle:
         source = (REPO_ROOT / "micropython" / "line_sensor.py").read_text(encoding="utf-8")
         return tool.adapt_ur_for_bundle(tool.extract_ur_module(source))
 
-    def test_the_constructor_no_longer_takes_a_remote_class(self, adapted):
-        assert "def __init__(self, port=None, settle_ms=1):" in adapted
-        assert "remote_class" not in adapted
+    def test_the_constructor_keeps_the_injectable_remote_class(self, adapted):
+        assert "def __init__(self, port=None, settle_ms=1, remote_class=None):" in adapted
 
     def test_the_bundle_uses_the_inlined_uremote(self, adapted):
         assert "from uremote import" not in adapted
-        assert "self.ur = uRemote(port) if port else uRemote()" in adapted
+        assert "remote = remote_class or uRemote" in adapted
+        assert "self.ur_error = uRemoteError" in adapted
 
     def test_the_wait_fallback_is_removed(self, adapted):
         assert "from time import sleep" not in adapted

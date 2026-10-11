@@ -137,12 +137,3 @@ class TestDecodingMatchesTheFullDriver:
     def test_the_bundle_never_inverts_values(self):
         slim = bundle.BaseLineSensor()
         assert slim._select_indices(self.PACKET, (-1,)) == tuple(self.PACKET[:8])
-
-
-def test_bundled_uremote_refuses_blocking_calls_under_run_task(monkeypatch, bench):
-    bench.link("uart1", "portB")
-    monkeypatch.setattr(bundle, "run_task", lambda: True)
-    remote = bundle.uRemote("B")
-    with pytest.raises(bundle.uRemoteError, match="call_async"):
-        remote.call("all")
-    assert bench.endpoint("portB").peer.rx == b""

@@ -5,38 +5,7 @@ import pytest
 import line_sensor
 from line_sensor import BaseLineSensor, LineSensorUR
 
-CONFIG = bytes([5, 6, 1, 4, 128, 1, 0])
-PACKET = bytes([10, 20, 30, 40, 50, 60, 70, 80, 200, 5, 90, 100, ord("T")])
-
-
-class FakeRemote:
-    """A uRemote client that records calls and answers from a table."""
-
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        self.calls = []
-        self.replies = {
-            "get_config": CONFIG,
-            "all": PACKET,
-            "data": PACKET[:8],
-            "get_version": (5, 6),
-            "pds": bytes([200, 100, ord("T")]),
-            "get_uid": bytes(range(12)),
-            "is_calibrated": 1,
-            "blackline": 1,
-        }
-
-    def call(self, command, *arguments):
-        self.calls.append((command, arguments))
-        reply = self.replies.get(command, 1)
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
-
-    @property
-    def commands(self):
-        return [command for command, _ in self.calls]
+from fakes import CONFIG, PACKET, ScriptedRemote as FakeRemote
 
 
 @pytest.fixture

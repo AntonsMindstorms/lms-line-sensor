@@ -39,7 +39,7 @@ def client_commands():
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "call"
+            and node.func.attr in ("call", "_call_bytes", "_call_bool")
             and node.args
             and isinstance(node.args[0], ast.Constant)
         ):

@@ -113,6 +113,20 @@ while True:
     print(sensor.position(), sensor.derivative(), sensor.shape())
 ```
 
+Inside `run_task()` / `multitask()` the same methods are awaitable. Put
+`await` in front of every sensor call; nothing else changes:
+
+```python
+from pybricks.tools import multitask, run_task, wait
+
+async def follow():
+    while True:
+        print(await sensor.position())
+        await wait(10)
+
+run_task(multitask(follow(), other_task()))
+```
+
 ### MicroBlocks
 
 Shape is an ASCII character:
@@ -177,6 +191,9 @@ sphinx-build -b html docs docs/_build/html
 
 - Main MicroPython source: `micropython/line_sensor.py`
 - Pybricks bundle: `tools/generate_line_sensor_pybricks.py` → `micropython/line_sensor_pybricks.py`
+- uRemote is a git submodule at `micropython/vendor/uRemote`. Clone with
+  `git clone --recurse-submodules`, or run `git submodule update --init` in an
+  existing checkout. The bundle generator trims the Pybricks client from it.
 - LMS-ESP32 uRemote server: `micropython/line_sensor_ur_server.py`
 - Sphinx mocks the MicroPython `machine` module for desktop builds
 - Tests need no hardware: `python -m pip install pytest && python -m pytest` (see [`tests/README.md`](tests/README.md))

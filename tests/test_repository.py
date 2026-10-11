@@ -16,6 +16,7 @@ import line_sensor_ur_server
 from conftest import REPO_ROOT
 
 SKIPPED_DIRS = {".git", ".venv", "dist", "node_modules", "__pycache__", "_build"}
+SUBMODULES = [REPO_ROOT / "micropython" / "vendor" / "uRemote"]  # not ours to check
 
 
 def tracked(*patterns):
@@ -23,8 +24,11 @@ def tracked(*patterns):
     for pattern in patterns:
         for path in REPO_ROOT.rglob(pattern):
             relative = path.relative_to(REPO_ROOT)
-            if not SKIPPED_DIRS.intersection(relative.parts):
-                found.append(path)
+            if SKIPPED_DIRS.intersection(relative.parts):
+                continue
+            if any(submodule in path.parents for submodule in SUBMODULES):
+                continue
+            found.append(path)
     return sorted(found)
 
 

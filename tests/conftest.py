@@ -17,11 +17,16 @@ import fakes
 REPO_ROOT = Path(__file__).resolve().parents[1]
 for directory in (
     REPO_ROOT / "micropython",
-    REPO_ROOT / "micropython" / "vendor",  # the frozen ``uremote`` on LMS-ESP32
+    REPO_ROOT / "micropython" / "vendor" / "uRemote" / "library",  # uRemote submodule
     REPO_ROOT / "tools",
 ):
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
+
+if not (REPO_ROOT / "micropython" / "vendor" / "uRemote" / "library" / "uremote.py").exists():
+    raise pytest.UsageError(
+        "The uRemote submodule is missing. Run: git submodule update --init"
+    )
 
 # A bench must exist at import time: modules such as ``line_sensor`` are
 # imported during collection. Each test then gets a fresh one (see ``bench``).
