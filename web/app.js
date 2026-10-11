@@ -319,8 +319,12 @@ async function refreshDebug() {
 }
 
 async function initializeDevice() {
-  const uid = bytesFromReply(await remote.call("get_uid"), "get_uid");
+  const [uidReply, version] = await Promise.all([
+    remote.call("get_uid"), remote.call("get_version")
+  ]);
+  const uid = bytesFromReply(uidReply, "get_uid");
   $("uid").textContent = [...uid].map(value => value.toString(16).padStart(2, "0")).join("").toUpperCase();
+  $("statusVersion").textContent = `v${version[0]}.${version[1]}`;
   await Promise.all([refreshConfig(), refreshCalibration(), refreshDebug()]);
   await pollReadings();
 }

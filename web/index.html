@@ -13,7 +13,7 @@
       document.documentElement.dataset.theme = "light";
     }
   </script>
-  <link rel="stylesheet" href="styles.css?v=5.6">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
@@ -76,6 +76,10 @@
       <div class="status-item">
         <span class="label">Line type</span>
         <strong id="statusLineType" class="status-value">—</strong>
+      </div>
+      <div class="status-item">
+        <span class="label">Firmware</span>
+        <strong id="statusVersion" class="status-value">—</strong>
       </div>
     </section>
 
@@ -174,6 +178,6 @@
   </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=5.6"></script>
+  <script src="app.js"></script>
 </body>
 </html>
