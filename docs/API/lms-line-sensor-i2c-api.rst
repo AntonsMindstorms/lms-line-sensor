@@ -1,7 +1,7 @@
 LMS Line Sensor I2C API
 =======================
 
-| Firmware reference: **5.6**
+| Firmware reference: **5.7**
 | Default 7-bit slave address: **``0x33``**
 | Sensor channels: **8**
 

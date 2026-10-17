@@ -4,7 +4,7 @@ LMS Line Sensor
 Software and firmware for the eight-channel LMS reflectance line sensor
 (CH32V203). The board speaks I2C, UART uRemote, and USB CDC uRemote.
 
-**Current firmware version: 5.6**
+**Current firmware version: 5.7**
 
 Firmware, flashing, packet layout, EEPROM, LED modes, and the low-level command
 tables are maintained in the repository file ``firmware/README.md``. This page
@@ -15,8 +15,23 @@ Flash firmware
 
 1. Connect the line sensor to your PC with USB.
 2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
-3. Drag ``firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`` onto that drive.
+3. Drag ``firmware/firmware_ch32_line_v5_7.uf2`` onto that drive.
 4. Wait for the drive to disappear. Unplug and replug USB if NeoPixels do not scan.
+
+Black or white line
+-------------------
+
+Firmware 5.6 and later support both line types. The default is a **black line
+on a light surface**; no setup is needed for that case. For a white line on a
+dark surface, call ``sensor.blackline(False)`` and then recalibrate.
+
+In white-line mode the firmware inverts every channel (``255 - value``) before
+calibration, position, and shape processing, so line-following code written for
+a black line works unchanged. The setting is not stored in EEPROM: the sensor
+returns to black-line mode at power-up, so call ``blackline()`` again after
+every start. Calibration limits belong to one polarity, so recalibrate after
+changing it. ``blackline()`` without an argument returns the current setting
+on ``LineSensorUR``.
 
 Web dashboard
 -------------
@@ -119,10 +134,7 @@ Prefer these high-level names in new code: ``ir_power``, ``leds``,
 exist on both classes; ``LineSensorI2C`` also accepts ``led_mode``,
 ``rgb_mode`` and ``set_neopixel``.
 
-Line polarity: firmware 5.6 defaults to a black line on a light surface. Call
-``sensor.blackline(False)`` for a white line, then recalibrate. The setting is
-not stored in EEPROM, so call it again after power-up. ``blackline()`` without
-an argument returns the current setting on ``LineSensorUR``.
+Line polarity: see *Black or white line* above.
 
 Useful constants:
 

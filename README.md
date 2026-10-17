@@ -7,9 +7,9 @@ Drivers, firmware, and tools for the [LMS Line Sensor](https://www.antonsmindsto
 
 </div>
 
-## 1. Flash the sensor (firmware 5.6)
+## 1. Flash the sensor (firmware 5.7)
 
-Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`](firmware/firmware_ch32_line_i2c_ur_v5.6.uf2)
+Current UF2: [`firmware/firmware_ch32_line_v5_7.uf2`](firmware/firmware_ch32_line_v5_7.uf2)
 
 1. Connect the line sensor to your PC with USB.
 2. Press **RESET** twice quickly until a **CH32V UF2** drive appears.
@@ -17,6 +17,32 @@ Current UF2: [`firmware/firmware_ch32_line_i2c_ur_v5.6.uf2`](firmware/firmware_c
 4. If the NeoPixels do not scan, unplug and replug USB.
 
 Full hardware notes: [`firmware/README.md`](firmware/README.md).
+
+## Black or white line
+
+Firmware 5.6 and later support both line types. **The default is a black line
+on a light surface**, so nothing needs to be configured for the usual case.
+
+For a white line on a dark surface, call `blackline(False)` before calibrating:
+
+```python
+sensor.blackline(False)   # white line on a dark surface
+sensor.calibrate()        # recalibrate for the new polarity
+```
+
+How it works:
+
+- `blackline(True)` (default) uses the sensor readings as measured.
+- `blackline(False)` inverts every channel (`255 - value`) in the firmware,
+  before calibration, position, and shape processing. Your code and the LEDs
+  then see a line that reads like a black one, so the same line-following code works.
+- The setting is **not stored in EEPROM**. It returns to black-line mode at power-up,
+  so call it again after every start.
+- Calibration limits are stored for one polarity. After changing the line type,
+  recalibrate, otherwise the saved minima and maxima do not match.
+- `LineSensorUR.blackline()` without an argument returns the current setting.
+  Over raw protocols it is I2C `CMD_BLACKLINE` (command 23) or the uRemote
+  `blackline` command; see [`firmware/README.md`](firmware/README.md).
 
 ## 2. Pick a connection path
 
@@ -164,7 +190,7 @@ Compatibility aliases available on both classes: `set_emitter` (= `ir_power`) an
 
 `LineSensorI2C` also has `start_calibration()` and fine-grained calibration helpers.
 
-Line polarity: firmware 5.6 defaults to a black line. Use `blackline(False)` for a white line (then recalibrate); the setting is not stored in EEPROM. Both classes provide it, and `LineSensorUR.blackline()` without an argument reads the current value.
+Line polarity: `blackline(True/False)` selects a black (default) or white line; see [Black or white line](#black-or-white-line). Both classes provide it, and `LineSensorUR.blackline()` without an argument reads the current value.
 
 `LineSensorURServer` (LMS-ESP32) subclasses frozen `uRemote` and exposes the native uRemote command names over UART while talking to the sensor on I2C.
 

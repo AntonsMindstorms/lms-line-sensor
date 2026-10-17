@@ -1,7 +1,7 @@
 LMS Line Sensor uRemote API
 ===========================
 
-| Firmware reference: **5.6**
+| Firmware reference: **5.7**
 | UART speed: **115200 baud**
 | USB product: **Line Sensor uRemote**
 
