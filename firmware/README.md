@@ -22,7 +22,8 @@ Current firmware version: **5.7**.
    device will disappear automatically.
 6. If the NeoPixels do not scan, disconnect and reconnect USB power.
 
-## Features
+## Rewrite bootloader in flash
+When you can not activate the line sensor module's UF2 bootloader, you can try to reflash the bootloader. See [full firmware](./full_firmware/) on how to revive the bootloader.
 
 - Eight raw or calibrated reflectance values
 - Line position and position derivative
