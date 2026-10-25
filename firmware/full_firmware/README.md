@@ -3,7 +3,7 @@ This is the firmware that includes the UF2 bootloader. When the bootloader seems
 ## WCHISPTool
 This is a tool provided by WCH to flash the CH32v203 chip that is present in the line sensor module.
 
-* Down the \[WCHISPTool from the WCH website](https://www.wch-ic.com/downloads/WCHISPTool\_Setup\_exe.html).
+* Down the [WCHISPTool from the WCH website](https://www.wch-ic.com/downloads/WCHISPTool\_Setup\_exe.html).
 * Connect the line sensor using USB to you PC
 * start the WCHISPTool
 * press 'RESET' button while keeping 'BOOT0' pressed
