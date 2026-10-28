@@ -12,18 +12,67 @@ Current firmware version: **5.7**.
 
 ## How to flash firmware on the Line Sensor board
 
-1. Connect the Line Sensor board to your PC using USB.
-2. Press the **RESET** button twice in quick succession.
-3. A UF2 mass-storage device named **CH32V UF2** should appear in your PC's file
-   manager.
-4. Select the line-sensor UF2 firmware file and drag it onto the **CH32V UF2**
-   drive.
-5. Wait until the firmware has been written to the board. The UF2 mass-storage
-   device will disappear automatically.
-6. If the NeoPixels do not scan, disconnect and reconnect USB power.
+Flashing needs no special software: the board shows up as a USB drive and you
+copy a firmware file onto it. You need a USB cable that carries data (some
+charge-only cables do not work) and a Windows, macOS, or Linux computer.
+
+### Step 1: Download the firmware file
+
+The firmware is a single `.uf2` file, for example
+`firmware_ch32_line_v5_7.uf2`, stored in this
+folder on GitHub.
+
+1. Open the file's page on GitHub by clicking its name in the file list
+2. GitHub cannot preview a binary file, so you will see a page with only a
+   small toolbar. Click the **Download raw file** button (the downward arrow
+   icon, to the right of **Raw**), highlighted in the screenshot below.
+3. Your browser saves the file, usually into your **Downloads** folder. Check
+   that the name still ends in `.uf2`. Some browsers add `.txt` or rename the
+   file; if so, rename it back.
+
+![The Download raw file button on GitHub](./download_raw.png)
+
+> Tip: do not use "Save as" on the file link in the folder listing or copy
+> text from the page. That saves a web page, not the firmware.
+
+### Step 2: Start the board in UF2 bootloader mode
+
+1. Connect the Line Sensor board to your computer using USB.
+2. Press the **RESET** button twice in quick succession, like a double click.
+3. A new drive named **CH32V UF2** appears in your file manager (File Explorer
+   on Windows, Finder on macOS). On my Mac I often need to choose Go>Computer in the Finder (cmd-shift-c) to see the drive. If nothing appears, try the double press again with a slightly different rhythm, or see.  
+   [Troubleshooting](#troubleshooting-flashing).
+
+### Step 3: Copy the firmware to the board
+
+1. Open your **Downloads** folder.
+2. Drag the `.uf2` file onto the **CH32V UF2** drive.
+3. Wait a few seconds. The drive disappears by itself when the firmware has been
+   written. This is normal, and your computer may even warn that the drive was
+   removed unexpectedly. You can ignore that warning.
+4. The board restarts with the new firmware. If the NeoPixels do not scan,
+   disconnect and reconnect the USB cable.
+
+To confirm the update worked, connect with the [web dashboard](#usb-web-dashboard)
+and check the firmware version in the status strip.
+
+### Troubleshooting flashing
+
+- **No CH32V UF2 drive appears:** try another USB cable (it must carry data) or
+  another USB port, and press RESET twice more quickly. In MacOS finder, try pressing cmd-shift-C.
+- **The drive appears but the board does not restart with new firmware:** make
+  sure the file you copied really ends in `.uf2` and is about 90 KB. A file of a
+  few KB is probably a saved web page; download it again as described above.
+- **The bootloader never appears, even after many tries:** the bootloader itself
+  may be damaged. See the next section.
 
 ## Rewrite bootloader in flash
-When you can not activate the line sensor module's UF2 bootloader, you can try to reflash the bootloader. See [full firmware](./full_firmware/) on how to revive the bootloader.
+
+When you cannot activate the line sensor module's UF2 bootloader, you can try to
+reflash the bootloader. See [full firmware](./full_firmware/) on how to revive
+the bootloader.
+
+## Features
 
 - Eight raw or calibrated reflectance values
 - Line position and position derivative
